@@ -127,80 +127,86 @@ class ServiceManager: ObservableObject {
     }
 }
 
-// MARK: - nAIce Backend API (Whoop via health.santoslab.de)
+// MARK: - nAIce Whoop API (Amelia – health.santoslab.de)
+
+struct NAWhoop {
+    let connected: Bool
+    let recoveryScore: Int
+    let restingHeartRate: Int
+    let hrv: Double
+    let spo2: Double?
+    let skinTemp: Double?
+    let strain: Double
+    let kilojoule: Double
+    let avgHeartRate: Int
+    let maxHeartRate: Int
+    let sleepHours: Double
+    let sleepEfficiency: Double
+    let sleepPerformance: Double
+    let respiratoryRate: Double
+    let lastSync: String?
+    let cycleStart: String?
+    let cycleEnd: String?
+    let workouts: [[String: Any]]
+    let source: String
+
+    var lastSyncRelative: String {
+        guard let s = lastSync else { return "nie" }
+        let df = ISO8601DateFormatter()
+        df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let d = df.date(from: s) else {
+            df.formatOptions = [.withInternetDateTime]
+            guard let d = df.date(from: s) else { return s }
+            let diff = Int(-d.timeIntervalSinceNow)
+            return diff < 60 ? "vor \(diff)s" : diff < 3600 ? "vor \(diff/60)m" :
+                   diff < 86400 ? "vor \(diff/3600)h" : "vor \(diff/86400)d"
+        }
+        let diff = Int(-d.timeIntervalSinceNow)
+        return diff < 60 ? "vor \(diff)s" : diff < 3600 ? "vor \(diff/60)m" :
+               diff < 86400 ? "vor \(diff/3600)h" : "vor \(diff/86400)d"
+    }
+
+    static func from(_ d: [String: Any]) -> NAWhoop {
+        let r = d["recovery"] as? [String: Any] ?? [:]
+        let s = d["sleep"] as? [String: Any] ?? [:]
+        let c = d["cycle"] as? [String: Any] ?? [:]
+        return NAWhoop(
+            connected: d["connected"] as? Bool ?? false,
+            recoveryScore: r["score"] as? Int ?? 0,
+            restingHeartRate: r["resting_heart_rate"] as? Int ?? 0,
+            hrv: r["hrv"] as? Double ?? 0,
+            spo2: r["spo2"] as? Double,
+            skinTemp: r["skin_temp"] as? Double,
+            strain: c["strain"] as? Double ?? 0,
+            kilojoule: c["kilojoule"] as? Double ?? 0,
+            avgHeartRate: c["avg_hr"] as? Int ?? 0,
+            maxHeartRate: c["max_hr"] as? Int ?? 0,
+            sleepHours: s["total_hours"] as? Double ?? 0,
+            sleepEfficiency: s["efficiency_pct"] as? Double ?? 0,
+            sleepPerformance: s["performance_pct"] as? Double ?? 0,
+            respiratoryRate: s["respiratory_rate"] as? Double ?? 0,
+            lastSync: r["synced_at"] as? String,
+            cycleStart: c["start"] as? String,
+            cycleEnd: c["end"] as? String,
+            workouts: d["workouts"] as? [[String: Any]] ?? [],
+            source: "whoop_db_amelia"
+        )
+    }
+}
 @MainActor
 class NAiceAPI: ObservableObject {
     static let shared = NAiceAPI()
     @Published var whoop: NAWhoop?
-    @Published var ideas: [NAIdea] = []
     @Published var isLoading = false
 
-    func fetchWhoop(serverURL: URL) async {
+    func fetchWhoop() async {
         isLoading = true
-        let url = URL(string: "https://health.santoslab.de/whoop/api/whoop/current")!
+        let url = URL(string: "https://health.santoslab.de/whoop/summary")!
         guard let (data, _) = try? await URLSession.shared.data(from: url),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { isLoading = false; return }
         whoop = NAWhoop.from(json)
         isLoading = false
-    }
-}
-struct NAWhoop {
-    let connected: Bool
-    let recoveryScore: Int
-    let hrv: Double
-    let restingHeartRate: Int
-    let strain: Double
-    let avgHeartRate: Int
-    let sleepHours: Double
-    let sleepPerformance: Double
-    let sleepConsistency: Double
-    let sleepEfficiency: Double
-    let deepSleepHours: Double
-    let remSleepHours: Double
-    let lightSleepHours: Double
-    let spo2: Double?
-    let respiratoryRate: Double
-    let skinTemp: Double?
-    let lastSync: String?
-    let cycleStart: String?
-    let cycleEnd: String?
-    let source: String
-
-    var lastSyncRelative: String {
-        guard let s = lastSync else { return "nie" }
-        let df = ISO8601DateFormatter(); df.formatOptions = [.withInternetDateTime]
-        guard let d = df.date(from: s) else { return s }
-        let diff = Int(-d.timeIntervalSinceNow)
-        if diff < 60 { return "vor \(diff)s" }
-        if diff < 3600 { return "vor \(diff/60)m" }
-        if diff < 86400 { return "vor \(diff/3600)h" }
-        return "vor \(diff/86400)d"
-    }
-
-    static func from(_ d: [String: Any]) -> NAWhoop {
-        NAWhoop(
-            connected: d["connected"] as? Bool ?? false,
-            recoveryScore: d["recovery_score"] as? Int ?? 0,
-            hrv: d["hrv"] as? Double ?? 0,
-            restingHeartRate: d["resting_heart_rate"] as? Int ?? 0,
-            strain: d["strain"] as? Double ?? 0,
-            avgHeartRate: d["avg_heart_rate"] as? Int ?? 0,
-            sleepHours: d["sleep_hours"] as? Double ?? 0,
-            sleepPerformance: d["sleep_performance"] as? Double ?? 0,
-            sleepConsistency: d["sleep_consistency"] as? Double ?? 0,
-            sleepEfficiency: d["sleep_efficiency"] as? Double ?? 0,
-            deepSleepHours: d["deep_sleep_hours"] as? Double ?? 0,
-            remSleepHours: d["rem_sleep_hours"] as? Double ?? 0,
-            lightSleepHours: d["light_sleep_hours"] as? Double ?? 0,
-            spo2: d["spo2"] as? Double,
-            respiratoryRate: d["respiratory_rate"] as? Double ?? 0,
-            skinTemp: d["skin_temp"] as? Double,
-            lastSync: d["last_sync"] as? String,
-            cycleStart: d["cycle_start"] as? String,
-            cycleEnd: d["cycle_end"] as? String,
-            source: d["source"] as? String ?? ""
-        )
     }
 }
 struct NAIdea: Identifiable { let id: String; let text: String; let createdAt: Date }
@@ -221,7 +227,7 @@ struct NAIceTabView: View {
             NavigationStack { NAIceLifeView(services: services) }.tabItem { Label(Tab.life.title, systemImage: Tab.life.icon) }.tag(Tab.life)
             SessionListView(authManager: authManager, server: server, pendingSharedImport: $ps, pendingDeepLinkedSessionID: $pd, requestedNewChat: $pn).tabItem { Label(Tab.agent.title, systemImage: Tab.agent.icon) }.tag(Tab.agent)
             NavigationStack { NAIceMoreView() }.tabItem { Label(Tab.more.title, systemImage: Tab.more.icon) }.tag(Tab.more)
-        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchWhoop(serverURL: server) }
+        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchWhoop() }
     }
 }
 
@@ -263,23 +269,7 @@ struct AgentHubView: View {
                             // Sleep breakdown
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack { Text("Schlaf").font(.subheadline).foregroundColor(.ncMuted); Spacer(); Text(String(format: "%.1fh", w.sleepHours)).font(.subheadline.weight(.bold)).foregroundColor(.ncDark); if w.sleepEfficiency > 0 { Text("\(Int(w.sleepEfficiency))%").font(.caption).foregroundColor(.ncSage) } }
-                                if w.deepSleepHours > 0 || w.remSleepHours > 0 || w.lightSleepHours > 0 {
-                                    let total = max(w.deepSleepHours + w.remSleepHours + w.lightSleepHours, 0.1)
-                                    GeometryReader { geo in
-                                        HStack(spacing: 1) {
-                                            Rectangle().fill(Color.ncGreen).frame(width: geo.size.width * CGFloat(w.deepSleepHours / total)).overlay(Text("D").font(.system(size: 7)).foregroundColor(.white))
-                                            Rectangle().fill(Color.ncSage).frame(width: geo.size.width * CGFloat(w.remSleepHours / total)).overlay(Text("R").font(.system(size: 7)).foregroundColor(.white))
-                                            Rectangle().fill(Color.ncSand.opacity(0.5)).frame(width: geo.size.width * CGFloat(w.lightSleepHours / total)).overlay(Text("L").font(.system(size: 7)).foregroundColor(.white))
-                                        }.clipShape(RoundedRectangle(cornerRadius: 4))
-                                    }.frame(height: 14)
-                                    HStack(spacing: 8) {
-                                        legend("Deep", Color.ncGreen)
-                                        legend("REM", Color.ncSage)
-                                        legend("Light", Color.ncSand.opacity(0.5))
-                                        Spacer()
-                                        if w.remSleepHours > 0 { Text("REM \(String(format: "%.1f", w.remSleepHours))h").font(.system(size: 9)).foregroundColor(.ncMuted) }
-                                    }
-                                }
+                                if w.sleepPerformance > 0 { HStack(spacing: 4) { Text("Performance:").font(.system(size: 9)).foregroundColor(.ncMuted); Text("\(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncDark) } }
                             }
                             Divider().foregroundColor(.ncSand.opacity(0.3))
                             // Additional metrics row
