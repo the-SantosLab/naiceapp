@@ -50,20 +50,26 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSContactsUsageDescription</key>
+	<string>nAIce checks your contacts to show birthdays and suggest refreshing old connections.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>nAIce reads your health data (steps, heart rate, sleep) to show on your dashboard.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>nAIce uses your location to provide context-aware insights.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>nAIce needs microphone access to dictate text into the message composer.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>nAIce needs camera access to capture and attach photos directly in chat.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>nAIce reads your health data (steps, heart rate, sleep) to show on your dashboard.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>nAIce needs photo library access to attach images to chat messages.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Hermex needs permission to save exported workspace images to Photos.</string>
+	<string>nAIce needs permission to save exported workspace images to Photos.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>nAIce checks your reminders to show upcoming tasks and deadlines.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Hermex uses speech recognition to turn dictated audio into editable draft text.</string>
+	<string>nAIce uses speech recognition to turn dictated audio into editable draft text.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
