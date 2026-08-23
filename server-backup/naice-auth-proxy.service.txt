@@ -1,0 +1,12 @@
+[Unit]
+Description=nAIce Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/naice_proxy_final.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

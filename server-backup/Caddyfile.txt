@@ -1,0 +1,430 @@
+pilates.santoslab.de {
+	reverse_proxy localhost:8700
+}
+
+ki.santoslab.de {
+	reverse_proxy localhost:4446
+}
+
+plex.santoslab.de {
+	reverse_proxy localhost:8443
+}
+
+decisions.santoslab.de {
+	reverse_proxy localhost:8444
+}
+
+monitoring.santoslab.de {
+	reverse_proxy localhost:3005
+}
+
+swarm.santoslab.de {
+	reverse_proxy localhost:8445
+}
+
+go.getspawn.app {
+	reverse_proxy localhost:8445
+}
+
+getspawn.app {
+	reverse_proxy localhost:8448
+}
+
+dog.santoslab.de {
+	reverse_proxy localhost:8449
+}
+
+pmark.santoslab.de {
+	reverse_proxy localhost:8450
+}
+
+builder.naice.app {
+	reverse_proxy localhost:9090
+}
+
+naice.app {
+	redir /blog* https://naice.pro{uri} permanent
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-builder/public-landing
+	handle_path /track-cta {
+		reverse_proxy localhost:8080
+	}
+	file_server
+}
+
+agent.santoslab.de {
+	# Auth endpoints -> Proxy first (akzeptiert jedes Passwort)
+	handle /health {
+		reverse_proxy http://127.0.0.1:8453
+	}
+	handle /api/auth/* {
+		reverse_proxy http://127.0.0.1:8453
+	}
+	# Static paths
+	handle_path /naice-test/* {
+		root * /opt/naice-app-test
+		file_server
+	}
+	handle_path /naice-app/* {
+		root * /opt/naice-app-build
+		file_server
+	}
+	handle_path /server2/* {
+		reverse_proxy http://76.13.150.247:8454
+	}
+	# Alles andere -> Direkt an Hermes WebUI
+	handle {
+		reverse_proxy http://127.0.0.1:8787
+	}
+}
+
+go.naice.app {
+	# Static paths first
+	handle_path /swarmiq/* {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/swarmiq/dist
+		file_server
+	}
+	handle_path /ops/* {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/naice-ops
+		file_server
+	}
+	# Everything else to console
+	reverse_proxy localhost:8453
+}
+
+referral.santoslab.de {
+	tls internal
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/perle-mockup
+	file_server
+}
+
+naice.pro {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro
+
+	try_files {path} {path}.html {path}/index.html
+	header Cache-Control "no-cache, no-store, must-revalidate"
+	header Pragma "no-cache"
+	header Expires "0"
+	file_server
+
+	handle_errors {
+		@404 expression {err.status_code} == 404
+		handle @404 {
+			redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+			root * /opt/naice-pro
+			rewrite * /404.html
+			file_server
+		}
+	}
+
+	handle_path /einfachr/* {
+		redir /warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/naice-pro/einfachr
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+
+	handle_path /api/public/* {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/naice-pro/api/public
+		file_server
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8451
+	}
+}
+components.naice.pro {
+	@chatApi {
+		path /api/chat /api/chat/*
+	}
+	reverse_proxy @chatApi 127.0.0.1:8460
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/components-nAIce-pro
+	file_server
+}
+
+staging.naice.pro {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro-staging
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+
+	header Cache-Control "no-cache, no-store, must-revalidate"
+	header Pragma "no-cache"
+	header Expires "0"
+
+	handle_errors {
+		@404 expression {err.status_code} == 404
+		handle @404 {
+			redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+			root * /opt/naice-pro-staging
+			rewrite * /404.html
+			file_server
+		}
+	}
+}
+
+audit.naice.pro {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/www
+	file_server
+}
+
+concierge.naice.pro {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /var/www/html
+	file_server
+}
+
+firmvarna.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/firmvarna-landing
+	try_files {path} {path}.html {path}/index.html
+	file_server
+
+	header Access-Control-Allow-Origin "*"
+	header Access-Control-Allow-Methods "GET, POST, OPTIONS, DELETE"
+	header Access-Control-Allow-Headers "Content-Type, Authorization"
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8452
+	}
+}
+
+app.firmvarna.com {
+	reverse_proxy 127.0.0.1:8452
+	header Access-Control-Allow-Origin "*"
+	header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+	header Access-Control-Allow-Headers "Content-Type"
+}
+
+firmvarna.com {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/firmvarna-com
+	try_files {path} {path}.html {path}/index.html
+	file_server
+
+	header Access-Control-Allow-Origin "*"
+	header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+	header Access-Control-Allow-Headers "Content-Type"
+
+	handle /api/waitlist {
+		reverse_proxy 127.0.0.1:8452
+	}
+}
+
+firmvarna.global {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/firmvarna-global
+	try_files {path} {path}.html {path}/index.html
+	file_server
+
+	header Access-Control-Allow-Origin "*"
+	header Access-Control-Allow-Methods "GET, OPTIONS"
+	header Access-Control-Allow-Headers "Content-Type"
+}
+trading.santoslab.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/vibe-trading-dashboard
+	file_server
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:9097
+	}
+}
+
+mtcon.santoslab.de {
+	@chatApi {
+		path /api/chat /api/chat/*
+	}
+	reverse_proxy @chatApi 127.0.0.1:8460
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/mtcon
+	file_server
+}
+
+crypto.santoslab.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/crypto-santoslab
+	file_server
+	encode gzip
+}
+
+santosone.com, www.santosone.com {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/santosone
+	try_files {path} {path}.html {path}/index.html
+	file_server
+
+	header Access-Control-Allow-Origin "*"
+	header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+	header Access-Control-Allow-Headers "Content-Type"
+}
+
+foodloop.one, pipe.foodloop.one, blog.foodloop.one {
+	@pipe host pipe.foodloop.one
+	handle @pipe {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/foodloop-pipeline
+		file_server
+	}
+	@blog host blog.foodloop.one
+	handle @blog {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/foodloop-blog/public
+		try_files {path} {path}.html {path}/index.html
+		file_server
+		encode gzip
+	}
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/foodloop
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	handle_path /staging* {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/foodloop-staging
+		file_server
+		basicauth {
+			foodloop $2a$14$70/T5GNCSrMsBEMR2jeFJe1HdQJ1yjSknG5i3GPsFmSZWzJvwW/aq
+		}
+	}
+
+	handle /api/waitlist {
+		reverse_proxy 127.0.0.1:8452
+		reverse_proxy 127.0.0.1:9098
+	}
+}
+
+transkript.naice.app {
+	reverse_proxy localhost:9091
+}
+
+Wedding.thesantos.life {
+	@chatApi {
+		path /api/chat /api/chat/*
+	}
+	reverse_proxy @chatApi 127.0.0.1:8460
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/wedding-thesantos-life
+	file_server
+	handle_path /staging* {
+		redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+		root * /opt/foodloop-staging
+		file_server
+		basicauth {
+			foodloop $2a$14$70/T5GNCSrMsBEMR2jeFJe1HdQJ1yjSknG5i3GPsFmSZWzJvwW/aq
+		}
+	}
+}
+
+schaffer-wine.de {
+	reverse_proxy 127.0.0.1:8461
+}
+
+thesantos.life {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/thesantos-life
+	encode gzip
+	file_server
+}
+
+einfachr.de, www.einfachr.de {
+	redir /mitarbeiterjahresgespraech-leitfaden-fuer-fuehrungskraefte /blog/mitarbeiterjahresgespraech-leitfaden-fuer-fuehrungskraefte 301
+	redir /minijob-und-krankenversicherung-aktuelle-regeln-2026 /blog/minijob-und-krankenversicherung-aktuelle-regeln-2026 301
+	redir /warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	redir /mindestlaufzeit-bei-arbeitsvertraegen-was-ist-erlaubt /blog/mindestlaufzeit-bei-arbeitsvertraegen-was-ist-erlaubt 301
+	redir /kuendigung-in-der-probezeit-was-ist-erlaubt /blog/kuendigung-in-der-probezeit-was-ist-erlaubt 301
+	redir /warum-externe-hr-agenturen-fuer-kmu-sinn-machen /blog/warum-externe-hr-agenturen-fuer-kmu-sinn-machen 301
+	redir /personalverwaltung-digitalisieren-so-gehts-richtig /blog/personalverwaltung-digitalisieren-so-gehts-richtig 301
+	redir /kuendigung-rechtssicher-aussprechen-schritt-fuer-schritt /blog/kuendigung-rechtssicher-aussprechen-schritt-fuer-schritt 301
+	redir /recruiting-im-mittelstand-so-findest-und-bindest-du-talente /blog/recruiting-im-mittelstand-so-findest-und-bindest-du-talente 301
+	redir /onboarding-checkliste-so-starten-neue-mitarbeiter-durch /blog/onboarding-checkliste-so-starten-neue-mitarbeiter-durch 301
+	redir /was-ist-lksg-lieferkettensorgfaltspflichten-einfach-erklaert /blog/was-ist-lksg-lieferkettensorgfaltspflichten-einfach-erklaert 301
+	redir /mitarbeiterbindung-im-mittelstand-7-strategien /blog/mitarbeiterbindung-im-mittelstand-7-strategien 301
+	redir /die-wahrheit-ueber-hr-software-wann-sie-hilft /blog/die-wahrheit-ueber-hr-software-wann-sie-hilft 301
+	redir /hr-strategie-fuer-wachstumsunternehmen-worauf-es-ankommt /blog/hr-strategie-fuer-wachstumsunternehmen-worauf-es-ankommt 301
+	redir /5-haeufige-fehler-im-arbeitsrecht /blog/5-haeufige-fehler-im-arbeitsrecht 301
+	redir /compliance-im-personalwesen-dsgvo-lksg-und-co /blog/compliance-im-personalwesen-dsgvo-lksg-und-co 301
+	redir /betriebsrat-gruenden-ablauf-und-tipps-fuer-arbeitgeber /blog/betriebsrat-gruenden-ablauf-und-tipps-fuer-arbeitgeber 301
+	redir /homeoffice-pflicht-aktuelle-rechtslage-in-deutschland /blog/homeoffice-pflicht-aktuelle-rechtslage-in-deutschland 301
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/einfachr
+
+	handle_path /track.gif {
+		reverse_proxy localhost:8089
+	}
+
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+einfachr-naice.pro {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/einfachr
+
+	handle_path /track.gif {
+		reverse_proxy localhost:8089
+	}
+
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+pitch.einfachr.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/einfachr/pitch
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+docs.einfachr.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/einfachr/docs
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+growth.einfachr.de {
+	redir /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung /blog/warum-eine-monatliche-hr-pauschale-fuer-kmu-die-beste-loesung-ist 301
+	root * /opt/naice-pro/einfachr/growth
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+jobs.einfachr.de {
+	root * /opt/naice-pro/einfachr/jobs
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+status.einfachr.de {
+	root * /opt/naice-pro/einfachr/status
+	try_files {path} {path}.html {path}/index.html
+	file_server
+	encode gzip
+}
+
+srv2.santoslab.de {
+	reverse_proxy http://76.13.150.247:8454
+}
+
+# nAIce OTA – iOS braucht korrekte MIME-Types
+(naice-mime) {
+	header /naice-app/*.ipa Content-Type application/octet-stream
+	import /etc/caddy/mime-override.conf
+	header /naice-app/*.plist Content-Type application/xml
+	import /etc/caddy/mime-override.conf
+}
