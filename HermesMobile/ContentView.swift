@@ -129,6 +129,70 @@ class ServiceManager: ObservableObject {
 
 // MARK: - nAIce Whoop API (Amelia – health.santoslab.de)
 
+struct NAWorkout: Identifiable {
+    let id = UUID()
+    let sport: String
+    let strain: Double
+    let maxHr: Int
+    let avgHr: Int
+    let kilojoule: Double
+    let start: String?
+    let end: String?
+
+    var durationMinutes: Int {
+        guard let s = start, let e = end else { return 0 }
+        let df = ISO8601DateFormatter()
+        df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let sd = df.date(from: s) ?? { df.formatOptions = [.withInternetDateTime]; return df.date(from: s) }(),
+              let ed = df.date(from: e) ?? { df.formatOptions = [.withInternetDateTime]; return df.date(from: e) }()
+        else { return 0 }
+        return Int(ed.timeIntervalSince(sd) / 60)
+    }
+
+    var sportIcon: String {
+        switch sport {
+        case "walking": return "figure.walk"
+        case "running": return "figure.run"
+        case "cycling": return "bicycle"
+        case "swimming": return "figure.pool.swim"
+        case "yoga": return "figure.cooldown"
+        case "meditation": return "brain.head.profile"
+        default: return "heart.circle"
+        }
+    }
+
+    static func from(_ d: [String: Any]) -> NAWorkout {
+        NAWorkout(
+            sport: d["sport"] as? String ?? "",
+            strain: d["strain"] as? Double ?? 0,
+            maxHr: d["max_hr"] as? Int ?? 0,
+            avgHr: d["avg_hr"] as? Int ?? 0,
+            kilojoule: d["kilojoule"] as? Double ?? 0,
+            start: d["start"] as? String,
+            end: d["end"] as? String
+        )
+    }
+}
+
+struct NASleepPhases {
+    let deepHours: Double
+    let remHours: Double
+    let lightHours: Double
+    let awakeHours: Double
+    let efficiencyPct: Double
+    let totalHours: Double
+    static func from(_ d: [String: Any]) -> NASleepPhases {
+        NASleepPhases(
+            deepHours: d["deep_hours"] as? Double ?? 0,
+            remHours: d["rem_hours"] as? Double ?? 0,
+            lightHours: d["light_hours"] as? Double ?? 0,
+            awakeHours: d["awake_hours"] as? Double ?? 0,
+            efficiencyPct: d["efficiency_pct"] as? Double ?? 0,
+            totalHours: d["total_hours"] as? Double ?? 0
+        )
+    }
+}
+
 struct NAWhoop {
     let connected: Bool
     let recoveryScore: Int
@@ -136,28 +200,29 @@ struct NAWhoop {
     let hrv: Double
     let spo2: Double
     let skinTemp: Double
+    let recoverySyncedAt: String
     let sleepHours: Double
     let sleepEfficiency: Double
     let sleepPerformance: Double
     let respiratoryRate: Double
-    let deepHours: Double
-    let remHours: Double
-    let lightHours: Double
-    let awakeHours: Double
+    let sleepStart: String?
+    let sleepEnd: String?
+    let phases: NASleepPhases
+    let phases7day: NASleepPhases?
     let strain: Double
     let kilojoule: Double
     let avgHeartRate: Int
     let maxHeartRate: Int
-    let lastSync: String
-    let source: String
-    let workouts: [[String: Any]]
+    let cycleStart: String?
+    let cycleEnd: String?
+    let workouts: [NAWorkout]
 
     var lastSyncRelative: String {
         let df = ISO8601DateFormatter()
         df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let d = df.date(from: lastSync) else {
+        guard let d = df.date(from: recoverySyncedAt) else {
             df.formatOptions = [.withInternetDateTime]
-            guard let d = df.date(from: lastSync) else { return lastSync }
+            guard let d = df.date(from: recoverySyncedAt) else { return recoverySyncedAt }
             let diff = Int(-d.timeIntervalSinceNow)
             return diff < 60 ? "vor \(diff)s" : diff < 3600 ? "vor \(diff/60)m" :
                    diff < 86400 ? "vor \(diff/3600)h" : "vor \(diff/86400)d"
@@ -171,7 +236,9 @@ struct NAWhoop {
         let r = d["recovery"] as? [String: Any] ?? [:]
         let s = d["sleep"] as? [String: Any] ?? [:]
         let p = s["phases"] as? [String: Any] ?? [:]
+        let p7 = s["phases_7day"] as? [String: Any]
         let c = d["cycle"] as? [String: Any] ?? [:]
+        let ws = (d["workouts"] as? [[String: Any]] ?? []).map { NAWorkout.from($0) }
         return NAWhoop(
             connected: d["connected"] as? Bool ?? false,
             recoveryScore: r["score"] as? Int ?? 0,
@@ -179,21 +246,22 @@ struct NAWhoop {
             hrv: r["hrv"] as? Double ?? 0,
             spo2: r["spo2"] as? Double ?? 0,
             skinTemp: r["skin_temp"] as? Double ?? 0,
+            recoverySyncedAt: r["synced_at"] as? String ?? "",
             sleepHours: s["total_hours"] as? Double ?? 0,
             sleepEfficiency: s["efficiency_pct"] as? Double ?? 0,
             sleepPerformance: s["performance_pct"] as? Double ?? 0,
             respiratoryRate: s["respiratory_rate"] as? Double ?? 0,
-            deepHours: p["deep_hours"] as? Double ?? 0,
-            remHours: p["rem_hours"] as? Double ?? 0,
-            lightHours: p["light_hours"] as? Double ?? 0,
-            awakeHours: p["awake_hours"] as? Double ?? 0,
+            sleepStart: s["start"] as? String,
+            sleepEnd: s["end"] as? String,
+            phases: NASleepPhases.from(p),
+            phases7day: p7.map { NASleepPhases.from($0) },
             strain: c["strain"] as? Double ?? 0,
             kilojoule: c["kilojoule"] as? Double ?? 0,
             avgHeartRate: c["avg_hr"] as? Int ?? 0,
             maxHeartRate: c["max_hr"] as? Int ?? 0,
-            lastSync: d["last_sync"] as? String ?? "",
-            source: d["source"] as? String ?? "",
-            workouts: d["workouts"] as? [[String: Any]] ?? []
+            cycleStart: c["start"] as? String,
+            cycleEnd: c["end"] as? String,
+            workouts: ws
         )
     }
 }
@@ -201,6 +269,7 @@ struct NAWhoop {
 class NAiceAPI: ObservableObject {
     static let shared = NAiceAPI()
     @Published var whoop: NAWhoop?
+    @Published var ideas: [NAIdea] = []
     @Published var isLoading = false
 
     func fetchWhoop() async {
@@ -212,13 +281,45 @@ class NAiceAPI: ObservableObject {
         whoop = NAWhoop.from(json)
         isLoading = false
     }
+
+    func fetchIdeas() async {
+        guard let url = URL(string: "https://health.santoslab.de/api/naice/ideas") else { return }
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return }
+        ideas = json.compactMap { NAIdea.from($0) }
+    }
+
+    func saveIdea(_ text: String) async {
+        guard let url = URL(string: "https://health.santoslab.de/api/naice/ideas") else { return }
+        var r = URLRequest(url: url); r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text, "source": "ios"])
+        guard let (data, _) = try? await URLSession.shared.data(for: r),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let is_ = json["ideas"] as? [[String: Any]]
+        else { return }
+        ideas = is_.compactMap { NAIdea.from($0) }
+    }
 }
-struct NAIdea: Identifiable { let id: String; let text: String; let createdAt: Date }
+struct NAIdea: Identifiable {
+    let id: String
+    let text: String
+    let createdAt: Date
+    static func from(_ d: [String: Any]) -> NAIdea? {
+        guard let id = d["id"] as? String, let text = d["text"] as? String else { return nil }
+        let dateStr = d["created_at"] as? String ?? ""
+        let df = ISO8601DateFormatter(); df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = df.date(from: dateStr) ?? ISO8601DateFormatter().date(from: dateStr.components(separatedBy: ".").first ?? "") ?? Date()
+        return NAIdea(id: id, text: text, createdAt: date)
+    }
+}
 
 // MARK: - Tab View
 @MainActor
 struct NAIceTabView: View {
     @Bindable var authManager: AuthManager; let server: URL
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .home; @State private var ps: SharedImport?; @State private var pd: String?; @State private var pn: NewChatRequest?
     @StateObject private var health = HealthManager.shared; @StateObject private var calendar = CalendarManager.shared; @StateObject private var services = ServiceManager.shared; @StateObject private var naice = NAiceAPI.shared
     enum Tab: String, CaseIterable { case home; case life; case agent; case more
@@ -231,7 +332,11 @@ struct NAIceTabView: View {
             NavigationStack { NAIceLifeView(services: services) }.tabItem { Label(Tab.life.title, systemImage: Tab.life.icon) }.tag(Tab.life)
             SessionListView(authManager: authManager, server: server, pendingSharedImport: $ps, pendingDeepLinkedSessionID: $pd, requestedNewChat: $pn).tabItem { Label(Tab.agent.title, systemImage: Tab.agent.icon) }.tag(Tab.agent)
             NavigationStack { NAIceMoreView() }.tabItem { Label(Tab.more.title, systemImage: Tab.more.icon) }.tag(Tab.more)
-        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchWhoop() }
+        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchWhoop(); await naice.fetchIdeas() }
+            .onChange(of: scenePhase) { newPhase in
+                guard newPhase == .active else { return }
+                Task { await naice.fetchWhoop(); await naice.fetchIdeas() }
+            }
     }
 }
 
@@ -240,7 +345,7 @@ struct AgentHubView: View {
     @ObservedObject var health: HealthManager; @ObservedObject var calendar: CalendarManager; @ObservedObject var services: ServiceManager; @ObservedObject var naice: NAiceAPI
         @Query(sort: \MoodEntry.date, order: .reverse) var moods: [MoodEntry]
             @Environment(\.modelContext) var mc
-            @State private var showIdea = false; @State private var newIdea = ""; @State private var ideas: [NAIdea] = []
+            @State private var showIdea = false; @State private var newIdea = ""
         var body: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -273,14 +378,14 @@ struct AgentHubView: View {
                             // Sleep breakdown
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack { Text("Schlaf").font(.subheadline).foregroundColor(.ncMuted); Spacer(); Text(String(format: "%.1fh", w.sleepHours)).font(.subheadline.weight(.bold)).foregroundColor(.ncDark); if w.sleepEfficiency > 0 { Text("\(Int(w.sleepEfficiency))%").font(.caption).foregroundColor(.ncSage) } }
-                                if w.remHours > 0 || w.lightHours > 0 {
-                                    let total = max(w.deepHours + w.remHours + w.lightHours + w.awakeHours, 0.1)
+                                if w.phases.remHours > 0 || w.phases.lightHours > 0 {
+                                    let total = max(w.phases.deepHours + w.phases.remHours + w.phases.lightHours + w.phases.awakeHours, 0.1)
                                     GeometryReader { geo in
                                         HStack(spacing: 1) {
-                                            Rectangle().fill(Color.ncDark).frame(width: geo.size.width * CGFloat(w.deepHours / total)).overlay(Text("D").font(.system(size: 7)).foregroundColor(.white))
-                                            Rectangle().fill(Color.ncGreen).frame(width: geo.size.width * CGFloat(w.remHours / total)).overlay(Text("R").font(.system(size: 7)).foregroundColor(.white))
-                                            Rectangle().fill(Color.ncSand.opacity(0.5)).frame(width: geo.size.width * CGFloat(w.lightHours / total)).overlay(Text("L").font(.system(size: 7)).foregroundColor(.white))
-                                            Rectangle().fill(Color.ncRed.opacity(0.3)).frame(width: geo.size.width * CGFloat(w.awakeHours / total)).overlay(Text("A").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncDark).frame(width: geo.size.width * CGFloat(w.phases.deepHours / total)).overlay(Text("D").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncGreen).frame(width: geo.size.width * CGFloat(w.phases.remHours / total)).overlay(Text("R").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncSand.opacity(0.5)).frame(width: geo.size.width * CGFloat(w.phases.lightHours / total)).overlay(Text("L").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncRed.opacity(0.3)).frame(width: geo.size.width * CGFloat(w.phases.awakeHours / total)).overlay(Text("A").font(.system(size: 7)).foregroundColor(.white))
                                         }.clipShape(RoundedRectangle(cornerRadius: 4))
                                     }.frame(height: 14)
                                     HStack(spacing: 8) {
@@ -288,6 +393,7 @@ struct AgentHubView: View {
                                         legend("Light", Color.ncSand.opacity(0.5)); legend("Awake", Color.ncRed.opacity(0.3))
                                         Spacer()
                                         if w.sleepPerformance > 0 { Text("Perf \(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncMuted) }
+                                        if let p7 = w.phases7day, p7.totalHours > 0 { Text("7d Ø \(String(format: "%.1f", p7.totalHours))h").font(.system(size: 9)).foregroundColor(.ncSage) }
                                     }
                                 } else if w.sleepPerformance > 0 { Text("Performance: \(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncMuted) }
                             }
@@ -307,6 +413,41 @@ struct AgentHubView: View {
                         VStack(spacing: 10) { Image(systemName: "heart.slash").font(.title2).foregroundColor(.ncSand); Text("Keine WHOOP-Daten verfugbar").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
                     }
 
+                    // Workouts
+                    if let w = naice.whoop, !w.workouts.isEmpty {
+                        NAIceSectionLabel(icon: "figure.run", title: "Workouts")
+                        let recent = Array(w.workouts.prefix(3))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(recent) { wo in
+                                    VStack(spacing: 6) {
+                                        Image(systemName: wo.sportIcon).font(.title2).foregroundColor(.ncGreen)
+                                        Text(wo.sport.capitalized).font(.system(size: 9)).foregroundColor(.ncMuted)
+                                        Text("\(wo.durationMinutes)min").font(.caption.weight(.semibold)).foregroundColor(.ncDark)
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "bolt.fill").font(.system(size: 7)).foregroundColor(.ncGold)
+                                            Text(String(format: "%.1f", wo.strain)).font(.system(size: 9)).foregroundColor(.ncDark)
+                                        }
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "heart.fill").font(.system(size: 7)).foregroundColor(.ncRed)
+                                            Text("\(wo.avgHr)").font(.system(size: 9)).foregroundColor(.ncMuted)
+                                        }
+                                    }.padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ncSand.opacity(0.4)))
+                                }
+                                if w.workouts.count > 3 {
+                                    NavigationLink(destination: WorkoutsDetailView(whoop: w)) {
+                                        VStack(spacing: 6) {
+                                            Image(systemName: "ellipsis.circle.fill").font(.title2).foregroundColor(.ncSage)
+                                            Text("Alle \(w.workouts.count)").font(.caption.weight(.semibold)).foregroundColor(.ncDark)
+                                            Text("Anzeigen →").font(.system(size: 8)).foregroundColor(.ncSage)
+                                        }.padding(10)
+                                    }
+                                }
+                            }.padding(.horizontal, 4)
+                        }.warmCard().padding(0)
+                    }
+
                     // HealthKit
                     if health.isAuthorized {
                         VStack(spacing: 12) {
@@ -319,10 +460,10 @@ struct AgentHubView: View {
                     QuickLogCard(mc: mc)
 
                     if showIdea {
-                        HStack(spacing: 8) { TextField("Idee eingeben...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand, lineWidth: 0.5)); Button("Speichern") { Task { ideas.append(NAIdea(id: UUID().uuidString, text: newIdea, createdAt: Date())); newIdea = ""; showIdea = false } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }.warmCard()
+                        HStack(spacing: 8) { TextField("Idee eingeben...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand, lineWidth: 0.5)); Button("Speichern") { Task { let t = newIdea; newIdea = ""; showIdea = false; await naice.saveIdea(t) } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }.warmCard()
                     } else { Button("Idee festhalten") { showIdea = true }.font(.caption).foregroundColor(.ncSage).padding(.horizontal, 4) }
 
-                    ForEach(Array(ideas.prefix(3))) { idea in HStack(spacing: 10) { Image(systemName: "lightbulb.fill").font(.caption).foregroundColor(.ncGold); Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Spacer(); Text(idea.createdAt, style: .relative).font(.caption2).foregroundColor(.ncMuted) }.warmCard() }
+                    ForEach(Array(naice.ideas.prefix(3))) { idea in HStack(spacing: 10) { Image(systemName: "lightbulb.fill").font(.caption).foregroundColor(.ncGold); Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Spacer(); Text(idea.createdAt, style: .relative).font(.caption2).foregroundColor(.ncMuted) }.warmCard() }
 
                     // Tag
                     HStack { VStack(alignment: .leading, spacing: 2) { Text("Dein Tag").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text(calendar.todayEvents.isEmpty ? "Keine Termine – Zeit fur deine Projekte" : "\(calendar.todayEvents.count) Termine heute").font(.subheadline).foregroundColor(.ncMuted) }; Spacer(); Image(systemName: calendar.todayEvents.isEmpty ? "sun.max.fill" : "calendar.badge.checkmark").foregroundColor(calendar.todayEvents.isEmpty ? .ncGold : .ncGreen).font(.title2) }.warmCard()
@@ -472,14 +613,14 @@ struct RelationsDetailView: View {
 }
 
 struct CreativityDetailView: View {
-    @ObservedObject var naice: NAiceAPI; @State private var newIdea = ""; @State private var ideas: [NAIdea] = []
+    @ObservedObject var naice: NAiceAPI; @State private var newIdea = ""
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Kreativitat").font(.title2.weight(.bold)).foregroundColor(.ncDark); Text("Sammle und entwickle Ideen mit deinem Agent.").font(.subheadline).foregroundColor(.ncMuted)
-                HStack(spacing: 8) { TextField("Neue Idee...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand)); Button("Speichern") { let i = newIdea; newIdea = ""; ideas.append(NAIdea(id: UUID().uuidString, text: i, createdAt: Date())) }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }
-                if ideas.isEmpty { Text("Noch keine Ideen gespeichert. Leg los!").font(.subheadline).foregroundColor(.ncMuted) }
-                ForEach(ideas) { idea in HStack(spacing: 12) { Image(systemName: "lightbulb.fill").font(.title3).foregroundColor(.ncGold); VStack(alignment: .leading, spacing: 2) { Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Text(idea.createdAt, style: .date).font(.caption).foregroundColor(.ncMuted) }; Spacer() }.warmCard() }
+                HStack(spacing: 8) { TextField("Neue Idee...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand)); Button("Speichern") { let t = newIdea; newIdea = ""; Task { await naice.saveIdea(t) } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }
+                if naice.ideas.isEmpty { Text("Noch keine Ideen gespeichert. Leg los!").font(.subheadline).foregroundColor(.ncMuted) }
+                ForEach(naice.ideas) { idea in HStack(spacing: 12) { Image(systemName: "lightbulb.fill").font(.title3).foregroundColor(.ncGold); VStack(alignment: .leading, spacing: 2) { Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Text(idea.createdAt, style: .date).font(.caption).foregroundColor(.ncMuted) }; Spacer() }.warmCard() }
                 cCard("Brainstorming-Partner", "Dein Agent kann mit dir zusammen Ideen entwickeln, erweitern und strukturieren. Einfach im Chat starten.")
                 cCard("Kreativ-Routinen", "Die besten Ideen kommen beim Spazierengehen oder unter der Dusche. Halte sie sofort fest – dein nAIce Agent speichert fur dich.", "brain.head.profile")
                 VStack(spacing: 8) { Text("AI-Tipp").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text("Setze dir ein Ziel: 3 Ideen pro Woche. Dein Agent hilft dir, sie zu sortieren und weiterzuentwickeln.").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
@@ -600,6 +741,34 @@ struct NAIceMoreView: View {
     }
     func moreR(_ i: String, _ t: String, _ s: String) -> some View { HStack { Image(systemName: i).font(.title3).foregroundColor(.ncSage).frame(width: 28); VStack(alignment: .leading, spacing: 2) { Text(t).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark); Text(s).font(.caption).foregroundColor(.ncMuted) }; Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundColor(.ncSand) }.warmCard() }
     func moreS(_ t: String) -> some View { HStack { Text(t).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark); Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundColor(.ncSand) }.warmCard() }
+}
+
+// MARK: - Workouts Detail
+struct WorkoutsDetailView: View {
+    let whoop: NAWhoop
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Workouts").font(.title2.weight(.bold)).foregroundColor(.ncDark)
+                Text("Die letzten \(whoop.workouts.count) Aktivitaten").font(.subheadline).foregroundColor(.ncMuted)
+                ForEach(whoop.workouts) { wo in
+                    HStack(spacing: 14) {
+                        Image(systemName: wo.sportIcon).font(.title2).foregroundColor(.ncGreen).frame(width: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(wo.sport.capitalized).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                            Text("\(wo.durationMinutes) min").font(.caption).foregroundColor(.ncMuted)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            HStack(spacing: 2) { Image(systemName: "bolt.fill").font(.system(size: 8)).foregroundColor(.ncGold); Text(String(format: "%.1f", wo.strain)).font(.caption.weight(.semibold)).foregroundColor(.ncDark) }
+                            HStack(spacing: 2) { Image(systemName: "heart.fill").font(.system(size: 8)).foregroundColor(.ncRed); Text("\(wo.avgHr) Ø").font(.caption).foregroundColor(.ncMuted) }
+                        }
+                    }.warmCard()
+                }
+                VStack(spacing: 8) { Text("AI-Tipp").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text("Deine Workout-Strain summiert sich auf \(String(format: "%.1f", whoop.workouts.reduce(0) { $0 + $1.strain })). Dein Korper signalisiert mit einem Recovery von \(whoop.recoveryScore)%: Heute kein Strain uber 10.").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
+        }.warmBackground().navigationTitle("Workouts").navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 #Preview { ContentView(authManager: AuthManager()) }
