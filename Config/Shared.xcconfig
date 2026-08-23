@@ -1,15 +1,8 @@
-// Shared app-identity and signing defaults, attached to the project as the
-// base configuration for both build configurations (Debug and Release).
-//
-// Contributors: never edit this file or project.pbxproj to sign with your own
-// Apple team. Create Config/Local.xcconfig (gitignored) instead — see
-// CONTRIBUTING.md ("Code signing for contributors").
+// Shared app-identity and signing defaults
+DEVELOPMENT_TEAM = GX89CS2T99
+PRODUCT_BUNDLE_IDENTIFIER = pro.naice.app
+APP_BUNDLE_IDENTIFIER = pro.naice.app
+MARKETING_VERSION = 1.0
 
-DEVELOPMENT_TEAM = 6GYD9C9N6R
-APP_IDENTIFIER_SUFFIX =
-APP_BUNDLE_IDENTIFIER = com.uzairansar.hermesmobile$(APP_IDENTIFIER_SUFFIX)
-APP_GROUP_IDENTIFIER = group.com.uzairansar.hermesmobile$(APP_IDENTIFIER_SUFFIX)
-
-// Optional per-machine overrides. This include must stay last: later
-// assignments win, so Local.xcconfig values override the defaults above.
+// Optional per-machine overrides
 #include? "Local.xcconfig"

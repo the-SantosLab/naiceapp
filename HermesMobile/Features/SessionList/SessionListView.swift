@@ -1268,34 +1268,13 @@ enum SessionListNewChatReturn {
 struct HermesHeaderLogo: View {
     let selectedColor: Color
 
-    private static let aspectRatio = 643.0 / 185.0
-
     var body: some View {
-        ZStack {
-            Image("hermes-fill-mask")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(selectedColor)
-
-            Image("hermes-shading-overlay")
-                .resizable()
-                .scaledToFit()
-                .blendMode(.multiply)
-
-            Image("hermes-highlight")
-                .resizable()
-                .scaledToFit()
-                .blendMode(.screen)
-
-            Image("hermes-outline-shadow")
-                .resizable()
-                .scaledToFit()
-        }
-        .aspectRatio(Self.aspectRatio, contentMode: .fit)
-        .compositingGroup()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("HERMEX")
+        Text("nAIce")
+            .font(.system(size: 24, weight: .bold, design: .rounded))
+            .foregroundColor(selectedColor)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .ignore)
     }
 }
 
@@ -1471,7 +1450,7 @@ private struct PendingNewChatView: View {
 
     private var pendingComposer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Message Hermex", text: $draftMessage, axis: .vertical)
+            TextField("Nachricht an nAIce", text: $draftMessage, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
                 .focused($composerIsFocused)
