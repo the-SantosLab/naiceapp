@@ -127,22 +127,83 @@ class ServiceManager: ObservableObject {
     }
 }
 
-// MARK: - nAIce Backend API
+// MARK: - nAIce Backend API (Whoop via health.santoslab.de)
 @MainActor
 class NAiceAPI: ObservableObject {
     static let shared = NAiceAPI()
-    let base = "https://agent.santoslab.de/api/naice"
-    @Published var profile: NAProfile?; @Published var whoop: NAWhoop?; @Published var suggestions: [NASuggestion] = []; @Published var ideas: [NAIdea] = []; @Published var isLoading = false
-    func fetchDashboard() async { isLoading = true; guard let url = URL(string: "\(base)/dashboard"), let (data, _) = try? await URLSession.shared.data(from: url), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { isLoading = false; return }; if let p = json["profile"] as? [String: Any] { profile = NAProfile.from(p) }; if let w = json["whoop"] as? [String: Any] { whoop = NAWhoop.from(w) }; if let ss = json["suggestions"] as? [[String: Any]] { suggestions = ss.compactMap { NASuggestion.from($0) } }; isLoading = false }
-    func generateSuggestions() async { guard let url = URL(string: "\(base)/suggestions/generate") else { return }; var r = URLRequest(url: url); r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.httpBody = "{}".data(using: .utf8); guard let (data, _) = try? await URLSession.shared.data(for: r), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let ss = json["suggestions"] as? [[String: Any]] else { return }; suggestions = ss.compactMap { NASuggestion.from($0) } }
-    func dismissSuggestion(_ id: String) async { suggestions.removeAll { $0.id == id }; guard let url = URL(string: "\(base)/suggestions/dismiss") else { return }; var r = URLRequest(url: url); r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.httpBody = try? JSONSerialization.data(withJSONObject: ["id": id]); _ = try? await URLSession.shared.data(for: r) }
-    func connectWhoop() async { guard let url = URL(string: "\(base)/whoop/connect") else { return }; var r = URLRequest(url: url); r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.httpBody = "{}".data(using: .utf8); guard let (data, _) = try? await URLSession.shared.data(for: r), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let w = json["whoop"] as? [String: Any] else { return }; whoop = NAWhoop.from(w) }
-    func addIdea(_ text: String) async { guard let url = URL(string: "\(base)/ideas") else { return }; var r = URLRequest(url: url); r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text]); guard let (data, _) = try? await URLSession.shared.data(for: r), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let is_ = json["ideas"] as? [[String: Any]] else { return }; ideas = is_.compactMap { NAIdea.from($0) } }
+    @Published var whoop: NAWhoop?
+    @Published var ideas: [NAIdea] = []
+    @Published var isLoading = false
+
+    func fetchWhoop(serverURL: URL) async {
+        isLoading = true
+        let url = URL(string: "https://health.santoslab.de/whoop/api/whoop/current")!
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { isLoading = false; return }
+        whoop = NAWhoop.from(json)
+        isLoading = false
+    }
 }
-struct NAProfile { let name: String; let role: String; let goals: [String]; let values: [String]; static func from(_ d: [String: Any]) -> NAProfile { NAProfile(name: d["name"] as? String ?? "", role: d["role"] as? String ?? "", goals: d["goals"] as? [String] ?? [], values: d["values"] as? [String] ?? []) } }
-struct NAWhoop { let connected: Bool; let recoveryScore: Int; let hrv: Double; let rhr: Int; let strain: Double; let sleepHours: Double; static func from(_ d: [String: Any]) -> NAWhoop { NAWhoop(connected: d["connected"] as? Bool ?? false, recoveryScore: d["recovery_score"] as? Int ?? 0, hrv: d["hrv"] as? Double ?? 0, rhr: d["resting_heart_rate"] as? Int ?? 0, strain: d["strain"] as? Double ?? 0, sleepHours: d["sleep_hours"] as? Double ?? 0) } }
-struct NASuggestion: Identifiable { let id: String; let type: String; let title: String; let text: String; let icon: String; let priority: String; var color: Color { priority == "high" ? .ncRed : priority == "medium" ? .ncGold : .ncSage }; static func from(_ d: [String: Any]) -> NASuggestion? { guard let id = d["id"] as? String else { return nil }; return NASuggestion(id: id, type: d["type"] as? String ?? "", title: d["title"] as? String ?? "", text: d["text"] as? String ?? "", icon: d["icon"] as? String ?? "sparkles", priority: d["priority"] as? String ?? "low") } }
-struct NAIdea: Identifiable { let id: String; let text: String; let createdAt: Date; static func from(_ d: [String: Any]) -> NAIdea? { guard let id = d["id"] as? String, let text = d["text"] as? String else { return nil }; return NAIdea(id: id, text: text, createdAt: ISO8601DateFormatter().date(from: d["created_at"] as? String ?? "") ?? Date()) } }
+struct NAWhoop {
+    let connected: Bool
+    let recoveryScore: Int
+    let hrv: Double
+    let restingHeartRate: Int
+    let strain: Double
+    let avgHeartRate: Int
+    let sleepHours: Double
+    let sleepPerformance: Double
+    let sleepConsistency: Double
+    let sleepEfficiency: Double
+    let deepSleepHours: Double
+    let remSleepHours: Double
+    let lightSleepHours: Double
+    let spo2: Double?
+    let respiratoryRate: Double
+    let skinTemp: Double?
+    let lastSync: String?
+    let cycleStart: String?
+    let cycleEnd: String?
+    let source: String
+
+    var lastSyncRelative: String {
+        guard let s = lastSync else { return "nie" }
+        let df = ISO8601DateFormatter(); df.formatOptions = [.withInternetDateTime]
+        guard let d = df.date(from: s) else { return s }
+        let diff = Int(-d.timeIntervalSinceNow)
+        if diff < 60 { return "vor \(diff)s" }
+        if diff < 3600 { return "vor \(diff/60)m" }
+        if diff < 86400 { return "vor \(diff/3600)h" }
+        return "vor \(diff/86400)d"
+    }
+
+    static func from(_ d: [String: Any]) -> NAWhoop {
+        NAWhoop(
+            connected: d["connected"] as? Bool ?? false,
+            recoveryScore: d["recovery_score"] as? Int ?? 0,
+            hrv: d["hrv"] as? Double ?? 0,
+            restingHeartRate: d["resting_heart_rate"] as? Int ?? 0,
+            strain: d["strain"] as? Double ?? 0,
+            avgHeartRate: d["avg_heart_rate"] as? Int ?? 0,
+            sleepHours: d["sleep_hours"] as? Double ?? 0,
+            sleepPerformance: d["sleep_performance"] as? Double ?? 0,
+            sleepConsistency: d["sleep_consistency"] as? Double ?? 0,
+            sleepEfficiency: d["sleep_efficiency"] as? Double ?? 0,
+            deepSleepHours: d["deep_sleep_hours"] as? Double ?? 0,
+            remSleepHours: d["rem_sleep_hours"] as? Double ?? 0,
+            lightSleepHours: d["light_sleep_hours"] as? Double ?? 0,
+            spo2: d["spo2"] as? Double,
+            respiratoryRate: d["respiratory_rate"] as? Double ?? 0,
+            skinTemp: d["skin_temp"] as? Double,
+            lastSync: d["last_sync"] as? String,
+            cycleStart: d["cycle_start"] as? String,
+            cycleEnd: d["cycle_end"] as? String,
+            source: d["source"] as? String ?? ""
+        )
+    }
+}
+struct NAIdea: Identifiable { let id: String; let text: String; let createdAt: Date }
 
 // MARK: - Tab View
 @MainActor
@@ -160,88 +221,122 @@ struct NAIceTabView: View {
             NavigationStack { NAIceLifeView(services: services) }.tabItem { Label(Tab.life.title, systemImage: Tab.life.icon) }.tag(Tab.life)
             SessionListView(authManager: authManager, server: server, pendingSharedImport: $ps, pendingDeepLinkedSessionID: $pd, requestedNewChat: $pn).tabItem { Label(Tab.agent.title, systemImage: Tab.agent.icon) }.tag(Tab.agent)
             NavigationStack { NAIceMoreView() }.tabItem { Label(Tab.more.title, systemImage: Tab.more.icon) }.tag(Tab.more)
-        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchDashboard() }
+        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await naice.fetchWhoop(serverURL: server) }
     }
 }
 
 // MARK: - Agent Hub (Home Tab)
 struct AgentHubView: View {
     @ObservedObject var health: HealthManager; @ObservedObject var calendar: CalendarManager; @ObservedObject var services: ServiceManager; @ObservedObject var naice: NAiceAPI
-    @Query(sort: \MoodEntry.date, order: .reverse) var moods: [MoodEntry]
-    @Environment(\.modelContext) var mc
-    @State private var showIdea = false; @State private var newIdea = ""
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                // Greeting
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 14) {
-                        Circle().fill(Color.ncGreen).frame(width: 48, height: 48).overlay(Image(systemName: "person.fill").font(.title3).foregroundColor(.white))
-                        VStack(alignment: .leading, spacing: 2) { Text("Hallo \(naice.profile?.name ?? "Johannes")").font(.headline.weight(.bold)).foregroundColor(.ncDark); Text(timeGreeting()).font(.subheadline).foregroundColor(.ncMuted) }
-                        Spacer()
-                    }
-                    if let w = naice.whoop, w.connected { HStack(spacing: 6) { Circle().fill(Color.ncGreen).frame(width: 8, height: 8); Text("Recovery \(w.recoveryScore)% – Whoop verbunden").font(.caption).foregroundColor(.ncGreen) } }
-                    if let m = moods.first { HStack(spacing: 6) { Image(systemName: moodIcon(m.mood)).font(.caption).foregroundColor(moodColor(m.mood)); Text(moodText(m.mood)).font(.caption).foregroundColor(.ncMuted) } }
-                }.warmCard()
+        @Query(sort: \MoodEntry.date, order: .reverse) var moods: [MoodEntry]
+            @Environment(\.modelContext) var mc
+            @State private var showIdea = false; @State private var newIdea = ""; @State private var ideas: [NAIdea] = []
+        var body: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Greeting
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 14) {
+                            Circle().fill(Color.ncGreen).frame(width: 48, height: 48).overlay(Image(systemName: "person.fill").font(.title3).foregroundColor(.white))
+                            VStack(alignment: .leading, spacing: 2) { Text("Hallo Johannes").font(.headline.weight(.bold)).foregroundColor(.ncDark); Text(timeGreeting()).font(.subheadline).foregroundColor(.ncMuted) }
+                            Spacer()
+                        }
+                    }.warmCard()
 
-                // Suggestions
-                if !naice.suggestions.isEmpty {
-                    NAIceSectionLabel(icon: "sparkles", title: "Dein Agent empfiehlt")
-                    ForEach(naice.suggestions) { s in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: s.icon).font(.title3).foregroundColor(s.color).frame(width: 28)
-                            VStack(alignment: .leading, spacing: 2) { Text(s.title).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark); Text(s.text).font(.caption).foregroundColor(.ncMuted) }
-                            Spacer(minLength: 8)
-                            Button { Task { await naice.dismissSuggestion(s.id) } } label: { Image(systemName: "xmark").font(.caption2).foregroundColor(.ncSand) }
+                    // WHOOP Dashboard
+                    NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit")
+                    if let w = naice.whoop, w.connected {
+                        VStack(alignment: .leading, spacing: 14) {
+                            // Recovery Score with progress bar
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack { Text("Recovery").font(.subheadline).foregroundColor(.ncMuted); Spacer(); Text("\(w.recoveryScore)%").font(.title3.weight(.bold)).foregroundColor(recoveryColor(w.recoveryScore)) }
+                                ProgressView(value: Double(w.recoveryScore), total: 100).tint(recoveryColor(w.recoveryScore))
+                            }
+                            // Key metrics
+                            HStack(spacing: 0) {
+                                wm("heart.fill", "\(w.restingHeartRate)", "Ruhepuls")
+                                wm("waveform.path.ecg", "\(Int(w.hrv))ms", "HRV")
+                                wm("bolt.fill", String(format: "%.1f", w.strain), "Strain")
+                                wm("heart.circle", "\(w.avgHeartRate)", "Puls Ø")
+                            }
+                            Divider().foregroundColor(.ncSand.opacity(0.3))
+                            // Sleep breakdown
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack { Text("Schlaf").font(.subheadline).foregroundColor(.ncMuted); Spacer(); Text(String(format: "%.1fh", w.sleepHours)).font(.subheadline.weight(.bold)).foregroundColor(.ncDark); if w.sleepEfficiency > 0 { Text("\(Int(w.sleepEfficiency))%").font(.caption).foregroundColor(.ncSage) } }
+                                if w.deepSleepHours > 0 || w.remSleepHours > 0 || w.lightSleepHours > 0 {
+                                    let total = max(w.deepSleepHours + w.remSleepHours + w.lightSleepHours, 0.1)
+                                    GeometryReader { geo in
+                                        HStack(spacing: 1) {
+                                            Rectangle().fill(Color.ncGreen).frame(width: geo.size.width * CGFloat(w.deepSleepHours / total)).overlay(Text("D").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncSage).frame(width: geo.size.width * CGFloat(w.remSleepHours / total)).overlay(Text("R").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncSand.opacity(0.5)).frame(width: geo.size.width * CGFloat(w.lightSleepHours / total)).overlay(Text("L").font(.system(size: 7)).foregroundColor(.white))
+                                        }.clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }.frame(height: 14)
+                                    HStack(spacing: 8) {
+                                        legend("Deep", Color.ncGreen)
+                                        legend("REM", Color.ncSage)
+                                        legend("Light", Color.ncSand.opacity(0.5))
+                                        Spacer()
+                                        if w.remSleepHours > 0 { Text("REM \(String(format: "%.1f", w.remSleepHours))h").font(.system(size: 9)).foregroundColor(.ncMuted) }
+                                    }
+                                }
+                            }
+                            Divider().foregroundColor(.ncSand.opacity(0.3))
+                            // Additional metrics row
+                            HStack(spacing: 0) {
+                                if let s = w.spo2 { wm("drop.fill", "\(Int(s))%", "SpO2") }
+                                wm("lungs.fill", "\(Int(w.respiratoryRate))", "Atmung")
+                                if let t = w.skinTemp { wm("thermometer", String(format: "%.1f", t), "Temp") }
+                            }
+                            // Last sync
+                            HStack(spacing: 4) { Image(systemName: "clock").font(.caption2).foregroundColor(.ncMuted); Text("Letzter Sync: \(w.lastSyncRelative)").font(.system(size: 10)).foregroundColor(.ncMuted); Spacer() }
+                        }.warmCard()
+                    } else if naice.isLoading {
+                        VStack(spacing: 12) { ProgressView(); Text("WHOEP wird geladen...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+                    } else {
+                        VStack(spacing: 10) { Image(systemName: "heart.slash").font(.title2).foregroundColor(.ncSand); Text("Keine WHOOP-Daten verfugbar").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+                    }
+
+                    // HealthKit
+                    if health.isAuthorized {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 0) { mini("figure.walk", "\(health.steps)", "Schritte"); mini("heart.fill", "\(Int(health.heartRate))", "Puls"); mini("waveform.path.ecg", "\(Int(health.hrv))ms", "HRV"); mini("moon.fill", String(format: "%.1fh", health.sleepHours), "Schlaf") }
                         }.warmCard()
                     }
-                }
 
-                // Health
-                if health.isAuthorized {
-                    NAIceSectionLabel(icon: "heart.fill", title: "Gesundheit")
-                    VStack(spacing: 12) {
-                        HStack(spacing: 0) { mini("figure.walk", "\(health.steps)", "Schritte"); mini("heart.fill", "\(Int(health.heartRate))", "Puls"); mini("waveform.path.ecg", "\(Int(health.hrv))ms", "HRV"); mini("moon.fill", String(format: "%.1fh", health.sleepHours), "Schlaf") }
-                        if let w = naice.whoop, w.connected {
-                            HStack(spacing: 12) { whoopMini("arrow.up.heart.fill", "\(w.recoveryScore)%", "Recovery"); whoopMini("heart.fill", "\(w.rhr)", "Ruhepuls"); whoopMini("bolt.fill", String(format: "%.1f", w.strain), "Strain"); whoopMini("moon.zzz.fill", String(format: "%.1fh", w.sleepHours), "Schlaf") }
-                        } else { Button("Whoop verbinden") { Task { await naice.connectWhoop() } }.font(.caption.weight(.semibold)).foregroundColor(.ncGreen).padding(.horizontal, 16).padding(.vertical, 8).background(Color.ncGreen.opacity(0.08), in: RoundedRectangle(cornerRadius: 9)).overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.ncGreen.opacity(0.15))) }
-                    }.warmCard()
-                }
+                    // QuickLog
+                    NAIceSectionLabel(icon: "square.and.pencil", title: "QuickLog & Ideen")
+                    QuickLogCard(mc: mc)
 
-                // QuickLog
-                NAIceSectionLabel(icon: "square.and.pencil", title: "QuickLog & Ideen")
-                QuickLogCard(mc: mc)
+                    if showIdea {
+                        HStack(spacing: 8) { TextField("Idee eingeben...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand, lineWidth: 0.5)); Button("Speichern") { Task { ideas.append(NAIdea(id: UUID().uuidString, text: newIdea, createdAt: Date())); newIdea = ""; showIdea = false } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }.warmCard()
+                    } else { Button("Idee festhalten") { showIdea = true }.font(.caption).foregroundColor(.ncSage).padding(.horizontal, 4) }
 
-                if showIdea {
-                    HStack(spacing: 8) { TextField("Idee eingeben...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand, lineWidth: 0.5)); Button("Speichern") { Task { await naice.addIdea(newIdea); newIdea = ""; showIdea = false } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }.warmCard()
-                } else { Button("Idee festhalten") { showIdea = true }.font(.caption).foregroundColor(.ncSage).padding(.horizontal, 4) }
+                    ForEach(Array(ideas.prefix(3))) { idea in HStack(spacing: 10) { Image(systemName: "lightbulb.fill").font(.caption).foregroundColor(.ncGold); Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Spacer(); Text(idea.createdAt, style: .relative).font(.caption2).foregroundColor(.ncMuted) }.warmCard() }
 
-                ForEach(Array(naice.ideas.prefix(3))) { idea in HStack(spacing: 10) { Image(systemName: "lightbulb.fill").font(.caption).foregroundColor(.ncGold); Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Spacer(); Text(idea.createdAt, style: .relative).font(.caption2).foregroundColor(.ncMuted) }.warmCard() }
+                    // Tag
+                    HStack { VStack(alignment: .leading, spacing: 2) { Text("Dein Tag").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text(calendar.todayEvents.isEmpty ? "Keine Termine – Zeit fur deine Projekte" : "\(calendar.todayEvents.count) Termine heute").font(.subheadline).foregroundColor(.ncMuted) }; Spacer(); Image(systemName: calendar.todayEvents.isEmpty ? "sun.max.fill" : "calendar.badge.checkmark").foregroundColor(calendar.todayEvents.isEmpty ? .ncGold : .ncGreen).font(.title2) }.warmCard()
 
-                // Tag
-                HStack { VStack(alignment: .leading, spacing: 2) { Text("Dein Tag").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text(calendar.todayEvents.isEmpty ? "Keine Termine – Zeit fur deine Projekte" : "\(calendar.todayEvents.count) Termine heute").font(.subheadline).foregroundColor(.ncMuted) }; Spacer(); Image(systemName: calendar.todayEvents.isEmpty ? "sun.max.fill" : "calendar.badge.checkmark").foregroundColor(calendar.todayEvents.isEmpty ? .ncGold : .ncGreen).font(.title2) }.warmCard()
-
-                // Lebensbereiche
-                NAIceSectionLabel(icon: "square.grid.2x2", title: "Meine Bereiche")
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    area("heart.fill", "Gesundheit", .ncRed, AnyView(HealthDetailView(naice: naice)))
-                    area("briefcase.fill", "Arbeit", .ncGreen, AnyView(WorkDetailView()))
-                    area("person.2.fill", "Beziehungen", .ncSage, AnyView(RelationsDetailView()))
-                    area("lightbulb.fill", "Kreativitat", .ncGold, AnyView(CreativityDetailView(naice: naice)))
-                    area("house.fill", "Alltag", .ncDark, AnyView(DailyDetailView()))
-                }
-            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
-        }.warmBackground().navigationTitle("nAIce").navigationBarTitleDisplayMode(.inline).task { await naice.generateSuggestions() }
-    }
-    func timeGreeting() -> String { let h = Calendar.current.component(.hour, from: Date()); if h < 6 { return "Nachtruhe?" }; if h < 9 { return "Guten Morgen!" }; if h < 12 { return "Guten Vormittag!" }; if h < 14 { return "Mittagspause?" }; if h < 17 { return "Nachmittag!" }; if h < 21 { return "Feierabend!" }; return "Gute Nacht!" }
-    func moodIcon(_ m: String) -> String { m == "good" ? "hand.thumbsup.fill" : m == "neutral" ? "hand.thumbsup" : "hand.thumbsdown" }
-    func moodColor(_ m: String) -> Color { m == "good" ? .ncGreen : m == "neutral" ? .ncGold : .ncRed }
-    func moodText(_ m: String) -> String { m == "good" ? "Gut gelaunt" : m == "neutral" ? "Neutral" : "Nicht so gut" }
-    func mini(_ i: String, _ v: String, _ l: String) -> some View { VStack(spacing: 4) { Image(systemName: i).font(.caption).foregroundColor(.ncSage); Text(v).font(.callout.weight(.bold)).foregroundColor(.ncDark); Text(l).font(.caption2).foregroundColor(.ncMuted) }.frame(maxWidth: .infinity) }
-    func whoopMini(_ i: String, _ v: String, _ l: String) -> some View { VStack(spacing: 2) { Image(systemName: i).font(.system(size: 10)).foregroundColor(.ncGreen); Text(v).font(.caption.weight(.bold)).foregroundColor(.ncDark); Text(l).font(.system(size: 8)).foregroundColor(.ncMuted) }.frame(maxWidth: .infinity) }
-    func area(_ icon: String, _ title: String, _ color: Color, _ dest: AnyView) -> some View {
-        NavigationLink(destination: dest) { VStack(spacing: 8) { Image(systemName: icon).font(.title2).foregroundColor(color); Text(title).font(.caption.weight(.semibold)).foregroundColor(.ncDark) }.frame(maxWidth: .infinity).padding(12).warmCard() }.buttonStyle(PlainButtonStyle())
-    }
+                    // Lebensbereiche
+                    NAIceSectionLabel(icon: "square.grid.2x2", title: "Meine Bereiche")
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        area("heart.fill", "Gesundheit", .ncRed, AnyView(HealthDetailView(naice: naice)))
+                        area("briefcase.fill", "Arbeit", .ncGreen, AnyView(WorkDetailView()))
+                        area("person.2.fill", "Beziehungen", .ncSage, AnyView(RelationsDetailView()))
+                        area("lightbulb.fill", "Kreativitat", .ncGold, AnyView(CreativityDetailView(naice: naice)))
+                        area("house.fill", "Alltag", .ncDark, AnyView(DailyDetailView()))
+                    }
+                }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
+            }.warmBackground().navigationTitle("nAIce").navigationBarTitleDisplayMode(.inline)
+        }
+        func timeGreeting() -> String { let h = Calendar.current.component(.hour, from: Date()); if h < 6 { return "Nachtruhe?" }; if h < 9 { return "Guten Morgen!" }; if h < 12 { return "Guten Vormittag!" }; if h < 14 { return "Mittagspause?" }; if h < 17 { return "Nachmittag!" }; if h < 21 { return "Feierabend!" }; return "Gute Nacht!" }
+        func recoveryColor(_ s: Int) -> Color { s >= 67 ? .ncGreen : s >= 34 ? .ncGold : .ncRed }
+        func wm(_ i: String, _ v: String, _ l: String) -> some View { VStack(spacing: 4) { Image(systemName: i).font(.caption).foregroundColor(.ncSage); Text(v).font(.caption.weight(.bold)).foregroundColor(.ncDark); Text(l).font(.system(size: 8)).foregroundColor(.ncMuted) }.frame(maxWidth: .infinity) }
+        func mini(_ i: String, _ v: String, _ l: String) -> some View { VStack(spacing: 4) { Image(systemName: i).font(.caption).foregroundColor(.ncSage); Text(v).font(.caption.weight(.bold)).foregroundColor(.ncDark); Text(l).font(.caption2).foregroundColor(.ncMuted) }.frame(maxWidth: .infinity) }
+        func legend(_ l: String, _ c: Color) -> some View { HStack(spacing: 3) { Circle().fill(c).frame(width: 6, height: 6); Text(l).font(.system(size: 9)).foregroundColor(.ncMuted) } }
+        func area(_ icon: String, _ title: String, _ color: Color, _ dest: AnyView) -> some View {
+            NavigationLink(destination: dest) { VStack(spacing: 8) { Image(systemName: icon).font(.title2).foregroundColor(color); Text(title).font(.caption.weight(.semibold)).foregroundColor(.ncDark) }.frame(maxWidth: .infinity).padding(12).warmCard() }.buttonStyle(PlainButtonStyle())
+        }
 }
 
 // MARK: - Life View
@@ -323,8 +418,8 @@ struct HealthDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Gesundheit").font(.title2.weight(.bold)).foregroundColor(.ncDark); Text("Deine Vitaldaten auf einen Blick.").font(.subheadline).foregroundColor(.ncMuted)
-                if !(naice.whoop?.connected ?? false) { Button("Whoop verbinden") { Task { await naice.connectWhoop() } }.foregroundColor(.white).frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 14)) }
-                if let w = naice.whoop, w.connected { VStack(spacing: 12) { HStack { Text("Whoop Recovery").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Spacer(); Text("\(w.recoveryScore)%").font(.largeTitle.weight(.bold)).foregroundColor(w.recoveryScore > 60 ? .ncGreen : .ncRed) }; ProgressView(value: Double(w.recoveryScore) / 100).tint(w.recoveryScore > 60 ? .ncGreen : .ncRed); Divider(); hRow("HRV", "\(Int(w.hrv)) ms"); hRow("Ruhepuls", "\(w.rhr) bpm"); hRow("Strain", String(format: "%.1f", w.strain)); hRow("Schlaf", String(format: "%.1f h", w.sleepHours)) }.warmCard() }
+                if !(naice.whoop?.connected ?? false) { Link(destination: URL(string: "https://health.santoslab.de/auth/whoop")!) { Text("Whoop verbinden").foregroundColor(.white).frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 14)) } }
+                if let w = naice.whoop, w.connected { VStack(spacing: 12) { HStack { Text("Whoop Recovery").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Spacer(); Text("\(w.recoveryScore)%").font(.largeTitle.weight(.bold)).foregroundColor(w.recoveryScore > 60 ? .ncGreen : .ncRed) }; ProgressView(value: Double(w.recoveryScore) / 100).tint(w.recoveryScore > 60 ? .ncGreen : .ncRed); Divider(); hRow("HRV", "\(Int(w.hrv)) ms"); hRow("Ruhepuls", "\(w.restingHeartRate) bpm"); hRow("Strain", String(format: "%.1f", w.strain)); hRow("Schlaf", String(format: "%.1f h", w.sleepHours)) }.warmCard() }
                 if health.isAuthorized { VStack(spacing: 10) { Text("HealthKit").font(.headline.weight(.semibold)).foregroundColor(.ncDark); hRow("Schritte", "\(health.steps)"); hRow("Puls", "\(Int(health.heartRate)) bpm"); hRow("HRV", "\(Int(health.hrv)) ms"); hRow("Schlaf", String(format: "%.1f h", health.sleepHours)) }.warmCard() }
                 VStack(spacing: 8) { Text("AI-Tipp").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text("Deine HRV und Schlafdaten geben Aufschluss uber deine Erholung. Ein Recovery Score uber 60% bedeutet, dass dein Korper bereit fur Belastung ist.").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
                 VStack(spacing: 8) { Text("Whoop API Echtzeitdaten").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text("Der Whoop-Server liefert deine aktuellen Vitaldaten automatisch. Recovery, HRV, Schlaf und Strain werden mit jeder Aktualisierung synchronisiert.").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
@@ -367,14 +462,14 @@ struct RelationsDetailView: View {
 }
 
 struct CreativityDetailView: View {
-    @ObservedObject var naice: NAiceAPI; @State private var newIdea = ""
+    @ObservedObject var naice: NAiceAPI; @State private var newIdea = ""; @State private var ideas: [NAIdea] = []
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Kreativitat").font(.title2.weight(.bold)).foregroundColor(.ncDark); Text("Sammle und entwickle Ideen mit deinem Agent.").font(.subheadline).foregroundColor(.ncMuted)
-                HStack(spacing: 8) { TextField("Neue Idee...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand)); Button("Speichern") { Task { let i = newIdea; newIdea = ""; await naice.addIdea(i) } }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }
-                if naice.ideas.isEmpty { Text("Noch keine Ideen gespeichert. Leg los!").font(.subheadline).foregroundColor(.ncMuted) }
-                ForEach(naice.ideas) { idea in HStack(spacing: 12) { Image(systemName: "lightbulb.fill").font(.title3).foregroundColor(.ncGold); VStack(alignment: .leading, spacing: 2) { Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Text(idea.createdAt, style: .date).font(.caption).foregroundColor(.ncMuted) }; Spacer() }.warmCard() }
+                HStack(spacing: 8) { TextField("Neue Idee...", text: $newIdea).padding(10).background(Color.ncPaper).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ncSand)); Button("Speichern") { let i = newIdea; newIdea = ""; ideas.append(NAIdea(id: UUID().uuidString, text: i, createdAt: Date())) }.font(.caption.weight(.semibold)).foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 8).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 9)) }
+                if ideas.isEmpty { Text("Noch keine Ideen gespeichert. Leg los!").font(.subheadline).foregroundColor(.ncMuted) }
+                ForEach(ideas) { idea in HStack(spacing: 12) { Image(systemName: "lightbulb.fill").font(.title3).foregroundColor(.ncGold); VStack(alignment: .leading, spacing: 2) { Text(idea.text).font(.subheadline).foregroundColor(.ncDark); Text(idea.createdAt, style: .date).font(.caption).foregroundColor(.ncMuted) }; Spacer() }.warmCard() }
                 cCard("Brainstorming-Partner", "Dein Agent kann mit dir zusammen Ideen entwickeln, erweitern und strukturieren. Einfach im Chat starten.")
                 cCard("Kreativ-Routinen", "Die besten Ideen kommen beim Spazierengehen oder unter der Dusche. Halte sie sofort fest – dein nAIce Agent speichert fur dich.", "brain.head.profile")
                 VStack(spacing: 8) { Text("AI-Tipp").font(.headline.weight(.semibold)).foregroundColor(.ncDark); Text("Setze dir ein Ziel: 3 Ideen pro Woche. Dein Agent hilft dir, sie zu sortieren und weiterzuentwickeln.").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
