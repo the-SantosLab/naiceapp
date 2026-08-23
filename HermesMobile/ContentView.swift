@@ -134,29 +134,30 @@ struct NAWhoop {
     let recoveryScore: Int
     let restingHeartRate: Int
     let hrv: Double
-    let spo2: Double?
-    let skinTemp: Double?
-    let strain: Double
-    let kilojoule: Double
-    let avgHeartRate: Int
-    let maxHeartRate: Int
+    let spo2: Double
+    let skinTemp: Double
     let sleepHours: Double
     let sleepEfficiency: Double
     let sleepPerformance: Double
     let respiratoryRate: Double
-    let lastSync: String?
-    let cycleStart: String?
-    let cycleEnd: String?
-    let workouts: [[String: Any]]
+    let deepHours: Double
+    let remHours: Double
+    let lightHours: Double
+    let awakeHours: Double
+    let strain: Double
+    let kilojoule: Double
+    let avgHeartRate: Int
+    let maxHeartRate: Int
+    let lastSync: String
     let source: String
+    let workouts: [[String: Any]]
 
     var lastSyncRelative: String {
-        guard let s = lastSync else { return "nie" }
         let df = ISO8601DateFormatter()
         df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let d = df.date(from: s) else {
+        guard let d = df.date(from: lastSync) else {
             df.formatOptions = [.withInternetDateTime]
-            guard let d = df.date(from: s) else { return s }
+            guard let d = df.date(from: lastSync) else { return lastSync }
             let diff = Int(-d.timeIntervalSinceNow)
             return diff < 60 ? "vor \(diff)s" : diff < 3600 ? "vor \(diff/60)m" :
                    diff < 86400 ? "vor \(diff/3600)h" : "vor \(diff/86400)d"
@@ -169,27 +170,30 @@ struct NAWhoop {
     static func from(_ d: [String: Any]) -> NAWhoop {
         let r = d["recovery"] as? [String: Any] ?? [:]
         let s = d["sleep"] as? [String: Any] ?? [:]
+        let p = s["phases"] as? [String: Any] ?? [:]
         let c = d["cycle"] as? [String: Any] ?? [:]
         return NAWhoop(
             connected: d["connected"] as? Bool ?? false,
             recoveryScore: r["score"] as? Int ?? 0,
             restingHeartRate: r["resting_heart_rate"] as? Int ?? 0,
             hrv: r["hrv"] as? Double ?? 0,
-            spo2: r["spo2"] as? Double,
-            skinTemp: r["skin_temp"] as? Double,
-            strain: c["strain"] as? Double ?? 0,
-            kilojoule: c["kilojoule"] as? Double ?? 0,
-            avgHeartRate: c["avg_hr"] as? Int ?? 0,
-            maxHeartRate: c["max_hr"] as? Int ?? 0,
+            spo2: r["spo2"] as? Double ?? 0,
+            skinTemp: r["skin_temp"] as? Double ?? 0,
             sleepHours: s["total_hours"] as? Double ?? 0,
             sleepEfficiency: s["efficiency_pct"] as? Double ?? 0,
             sleepPerformance: s["performance_pct"] as? Double ?? 0,
             respiratoryRate: s["respiratory_rate"] as? Double ?? 0,
-            lastSync: r["synced_at"] as? String,
-            cycleStart: c["start"] as? String,
-            cycleEnd: c["end"] as? String,
-            workouts: d["workouts"] as? [[String: Any]] ?? [],
-            source: "whoop_db_amelia"
+            deepHours: p["deep_hours"] as? Double ?? 0,
+            remHours: p["rem_hours"] as? Double ?? 0,
+            lightHours: p["light_hours"] as? Double ?? 0,
+            awakeHours: p["awake_hours"] as? Double ?? 0,
+            strain: c["strain"] as? Double ?? 0,
+            kilojoule: c["kilojoule"] as? Double ?? 0,
+            avgHeartRate: c["avg_hr"] as? Int ?? 0,
+            maxHeartRate: c["max_hr"] as? Int ?? 0,
+            lastSync: d["last_sync"] as? String ?? "",
+            source: d["source"] as? String ?? "",
+            workouts: d["workouts"] as? [[String: Any]] ?? []
         )
     }
 }
@@ -269,14 +273,30 @@ struct AgentHubView: View {
                             // Sleep breakdown
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack { Text("Schlaf").font(.subheadline).foregroundColor(.ncMuted); Spacer(); Text(String(format: "%.1fh", w.sleepHours)).font(.subheadline.weight(.bold)).foregroundColor(.ncDark); if w.sleepEfficiency > 0 { Text("\(Int(w.sleepEfficiency))%").font(.caption).foregroundColor(.ncSage) } }
-                                if w.sleepPerformance > 0 { HStack(spacing: 4) { Text("Performance:").font(.system(size: 9)).foregroundColor(.ncMuted); Text("\(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncDark) } }
+                                if w.remHours > 0 || w.lightHours > 0 {
+                                    let total = max(w.deepHours + w.remHours + w.lightHours + w.awakeHours, 0.1)
+                                    GeometryReader { geo in
+                                        HStack(spacing: 1) {
+                                            Rectangle().fill(Color.ncDark).frame(width: geo.size.width * CGFloat(w.deepHours / total)).overlay(Text("D").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncGreen).frame(width: geo.size.width * CGFloat(w.remHours / total)).overlay(Text("R").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncSand.opacity(0.5)).frame(width: geo.size.width * CGFloat(w.lightHours / total)).overlay(Text("L").font(.system(size: 7)).foregroundColor(.white))
+                                            Rectangle().fill(Color.ncRed.opacity(0.3)).frame(width: geo.size.width * CGFloat(w.awakeHours / total)).overlay(Text("A").font(.system(size: 7)).foregroundColor(.white))
+                                        }.clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }.frame(height: 14)
+                                    HStack(spacing: 8) {
+                                        legend("Deep", Color.ncDark); legend("REM", Color.ncGreen)
+                                        legend("Light", Color.ncSand.opacity(0.5)); legend("Awake", Color.ncRed.opacity(0.3))
+                                        Spacer()
+                                        if w.sleepPerformance > 0 { Text("Perf \(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncMuted) }
+                                    }
+                                } else if w.sleepPerformance > 0 { Text("Performance: \(Int(w.sleepPerformance))%").font(.system(size: 9)).foregroundColor(.ncMuted) }
                             }
                             Divider().foregroundColor(.ncSand.opacity(0.3))
                             // Additional metrics row
                             HStack(spacing: 0) {
-                                if let s = w.spo2 { wm("drop.fill", "\(Int(s))%", "SpO2") }
+                                if w.spo2 > 0 { wm("drop.fill", "\(Int(w.spo2))%", "SpO2") }
                                 wm("lungs.fill", "\(Int(w.respiratoryRate))", "Atmung")
-                                if let t = w.skinTemp { wm("thermometer", String(format: "%.1f", t), "Temp") }
+                                if w.skinTemp > 0 { wm("thermometer", String(format: "%.1f", w.skinTemp), "Temp") }
                             }
                             // Last sync
                             HStack(spacing: 4) { Image(systemName: "clock").font(.caption2).foregroundColor(.ncMuted); Text("Letzter Sync: \(w.lastSyncRelative)").font(.system(size: 10)).foregroundColor(.ncMuted); Spacer() }
