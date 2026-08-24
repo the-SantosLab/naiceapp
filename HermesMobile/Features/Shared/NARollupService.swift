@@ -18,25 +18,28 @@ class NARollupService: ObservableObject {
         var req = URLRequest(url: baseURL)
         req.timeoutInterval = 30
 
-        guard let (data, resp) = try? await URLSession.shared.data(for: req),
-              let http = resp as? HTTPURLResponse,
-              http.statusCode == 200
-        else {
-            lastError = "Verbindung fehlgeschlagen"
-            isLoading = false
-            return
-        }
-
         do {
-            let decoder = JSONDecoder()
-            let decoded = try decoder.decode(NARollup.self, from: data)
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else {
+                lastError = "Keine HTTP-Response"
+                isLoading = false
+                return
+            }
+            guard http.statusCode == 200 else {
+                let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+                lastError = "HTTP \(http.statusCode): \(body)"
+                isLoading = false
+                return
+            }
+
+            let decoded = try JSONDecoder().decode(NARollup.self, from: data)
             self.rollup = decoded
             self.isLoading = false
             print("[Rollup]✅ Erfolg: \(decoded.business?.foodloop?.total ?? 0) foodloop, \(decoded.deals?.active_deals ?? 0) deals")
         } catch {
-            self.lastError = "Dekodierung: \(error.localizedDescription)"
-            self.isLoading = false
-            print("[Rollup]❌ Decode Error: \(error)")
+            lastError = "\(error.localizedDescription)"
+            isLoading = false
+            print("[Rollup]❌ Error: \(error)")
         }
     }
 
