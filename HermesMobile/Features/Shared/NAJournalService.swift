@@ -41,10 +41,10 @@ class NAJournalService: ObservableObject {
         else { return }
 
         let entry = NAJournalEntry(
-            id: id,
-            text: text,
-            created_at: createdAt
-        )
+                    id: id,
+                    text: text,
+                    created_at: createdAt
+                )
         self.entries.insert(entry, at: 0)
     }
 

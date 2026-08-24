@@ -68,8 +68,8 @@ struct JournalCheckinCard: View {
                             Circle().fill(Color.ncSage.opacity(0.3)).frame(width: 6, height: 6)
                             Text(entry.text).font(.caption).foregroundColor(.ncMuted).lineLimit(1)
                             Spacer()
-                            if let t = entry.createdAt {
-                                Text(t.prefix(10)).font(.system(size: 9)).foregroundColor(.ncSand)
+                            if let t = entry.created_at {
+                                Text(String(t.prefix(10))).font(.system(size: 9)).foregroundColor(.ncSand)
                             }
                         }
                     }

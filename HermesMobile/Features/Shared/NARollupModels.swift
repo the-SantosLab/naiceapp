@@ -87,7 +87,7 @@ struct NAJournalRollup: Codable {
     let this_week: Int?
 }
 
-struct NAJournalEntry: Codable {
+struct NAJournalEntry: Codable, Identifiable {
     let id: String
     let text: String
     let created_at: String?
