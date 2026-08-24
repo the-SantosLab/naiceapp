@@ -149,7 +149,8 @@ class NAContactService: ObservableObject {
 
     // MARK: - Fetch
     func fetchContacts() async {
-        guard CNContactStore.authorizationStatus(for: .contacts) == .authorized else {
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        guard status == .authorized || status == .limited else {
             lastError = "Keine Kontaktberechtigung"
             return
         }
