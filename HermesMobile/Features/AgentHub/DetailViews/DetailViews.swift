@@ -75,19 +75,90 @@ struct HealthDetailView: View {
 
 // MARK: - Work Detail View
 struct WorkDetailView: View {
+    @StateObject private var rollup = NARollupService.shared
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Arbeit").font(.title2.weight(.bold)).foregroundColor(.ncDark)
-                Text("Deine Produktivitat im Uberblick.").font(.subheadline).foregroundColor(.ncMuted)
-                wCard("Chat Sessions", "Dein Hermes Agent ist bereit. Offne den Agent-Tab fur Sessions und Chats.", "bubble.left.and.bubble.right")
-                wCard("Notizen", "Erfasse und organisiere Gedanken. Der Agent fasst zusammen.", "note.text")
-                wCard("Proaktive Zusammenfassung", "Dein Agent kann regelmassig Zusammenfassungen deiner Chats und Notizen erstellen und dir Vorschlage unterbreiten.", "text.bubble.fill")
-                wCard("Aufgaben & Fokus", "Der Agent merkt sich deine Arbeitszeiten. Er schlagt optimale Fenster fur tiefe Arbeit vor.", "brain.head.profile")
+                Text("Deine Business-Ubersicht von Amelia.").font(.subheadline).foregroundColor(.ncMuted)
+
+                // Deals
+                if let d = rollup.deals, d.active_deals > 0 {
+                    hSection("eurosign", "Deals", "\(d.active_deals) aktiv · \(d.total_value_eur) €")
+                    ForEach(d.deals?.prefix(5) ?? []) { deal in
+                        HStack(spacing: 12) {
+                            Circle().fill(Color.ncGreen).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(deal.name).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                                Text(deal.status ?? "").font(.caption).foregroundColor(.ncMuted)
+                            }
+                            Spacer()
+                            Text("\(deal.value) €").font(.subheadline.weight(.bold)).foregroundColor(.ncGreen)
+                        }.warmCard()
+                    }
+                }
+
+                // Business
+                if let b = rollup.business {
+                    if let f = b.foodloop {
+                        hSection("fork.knife", "foodloop", "\(f.total) Kontakte")
+                        if let stats = f.statuses {
+                            bizStats(stats)
+                        }
+                        Text("Heiss: \(f.hot ?? 0) Kontakte").font(.caption).foregroundColor(.ncRed)
+                            .padding(.leading, 4)
+                    }
+                    if let n = b.naice {
+                        hSection("brain.head.profile", "nAIce", "\(n.total) Kontakte")
+                        if let stats = n.statuses {
+                            bizStats(stats)
+                        }
+                        Text("Gepitcht: \(n.statuses?["pitched"] ?? 0)").font(.caption).foregroundColor(.ncSage)
+                            .padding(.leading, 4)
+                    }
+                }
+
+                // Tasks
+                if let t = rollup.tasks, t.active > 0 {
+                    hSection("checklist", "Aufgaben", "\(t.active) offen")
+                    ForEach(t.tasks?.prefix(5) ?? []) { task in
+                        HStack(spacing: 12) {
+                            Image(systemName: task.priority == "high" ? "exclamationmark.circle.fill" : "circle")
+                                .foregroundColor(task.priority == "high" ? .ncRed : .ncSage)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(task.title).font(.subheadline).foregroundColor(.ncDark).lineLimit(2)
+                                HStack(spacing: 8) {
+                                    if let p = task.project { Text(p).font(.caption2).foregroundColor(.ncSage) }
+                                    if let d = task.deadline { Text("Frist: \(d)").font(.caption2).foregroundColor(.ncMuted) }
+                                }
+                            }
+                            Spacer()
+                        }.warmCard()
+                    }
+                }
+
+                // AI-Tipp
                 VStack(spacing: 8) {
                     Text("AI-Tipp").font(.headline.weight(.semibold)).foregroundColor(.ncDark)
-                    Text("Deine produktivste Zeit ist am Vormittag. Plane wichtige Aufgaben zwischen 9 und 12 Uhr.").font(.subheadline).foregroundColor(.ncMuted)
+                    if let flags = rollup.summary?.flags, !flags.isEmpty {
+                        ForEach(flags) { flag in
+                            HStack(spacing: 8) {
+                                Image(systemName: flag.level == "red" ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
+                                    .foregroundColor(flag.level == "red" ? .ncRed : .ncGold)
+                                    .font(.caption)
+                                Text(flag.text).font(.caption).foregroundColor(.ncMuted)
+                            }
+                        }
+                    } else {
+                        Text("Amelia analysiert deine Daten. Offne den Chat fur Details.").font(.subheadline).foregroundColor(.ncMuted)
+                    }
                 }.warmCard()
+
+                if rollup.isLoading {
+                    VStack(spacing: 12) { ProgressView(); Text("Amelia ladt...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+                }
             }
             .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 24)
         }
@@ -96,12 +167,26 @@ struct WorkDetailView: View {
         .navigationBarTitleDisplayMode(.large)
     }
 
-    func wCard(_ t: String, _ txt: String, _ i: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: i).font(.title2).foregroundColor(.ncSage).frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(t).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
-                Text(txt).font(.caption).foregroundColor(.ncMuted)
+    func hSection(_ icon: String, _ title: String, _ subtitle: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).font(.title3).foregroundColor(.ncSage)
+            Text(title).font(.headline.weight(.semibold)).foregroundColor(.ncDark)
+            Spacer()
+            Text(subtitle).font(.caption).foregroundColor(.ncMuted)
+        }
+        .padding(.top, 4).padding(.bottom, 2)
+    }
+
+    func bizStats(_ statuses: [String: Int]) -> some View {
+        let sorted = statuses.sorted { $0.value > $1.value }
+        return VStack(spacing: 4) {
+            ForEach(sorted.prefix(6), id: \.key) { key, val in
+                HStack(spacing: 8) {
+                    Text(key.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.caption).foregroundColor(.ncMuted)
+                    Spacer()
+                    Text("\(val)").font(.caption.weight(.semibold)).foregroundColor(.ncDark)
+                }
             }
         }.warmCard()
     }
