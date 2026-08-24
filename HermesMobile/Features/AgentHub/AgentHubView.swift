@@ -190,7 +190,6 @@ struct AgentHubView: View {
         .navigationTitle("nAIce")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await refreshAll() }
-        .task { await refreshAll() }
     }
 
     private func refreshAll() async {

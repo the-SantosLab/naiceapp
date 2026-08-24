@@ -12,6 +12,7 @@ class NARollupService: ObservableObject {
     @Published var lastError: String? = nil
 
     func fetch() async {
+        guard !Task.isCancelled else { return }
         isLoading = true
         lastError = nil
 
@@ -20,6 +21,7 @@ class NARollupService: ObservableObject {
 
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
+            guard !Task.isCancelled else { return }
             guard let http = resp as? HTTPURLResponse else {
                 lastError = "Keine HTTP-Response"
                 isLoading = false
