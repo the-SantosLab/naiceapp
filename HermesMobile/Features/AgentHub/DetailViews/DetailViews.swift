@@ -194,53 +194,92 @@ struct WorkDetailView: View {
 
 // MARK: - Relations Detail View
 struct RelationsDetailView: View {
-    @ObservedObject private var contacts = NAContactService.shared
+    @ObservedObject private var svc = NAContactService.shared
     @State private var searchText = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Beziehungen").font(.title2.weight(.bold)).foregroundColor(.ncDark)
-                Text("\(contacts.contacts.count) Kontakte · Dein personliches CRM.").font(.subheadline).foregroundColor(.ncMuted)
+                Text("\(svc.contacts.count) Kontakte · Dein soziales CRM.").font(.subheadline).foregroundColor(.ncMuted)
 
                 // Search
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundColor(.ncMuted)
-                    TextField("Suchen...", text: $searchText)
-                        .font(.subheadline)
+                    TextField("Suchen...", text: $searchText).font(.subheadline)
                 }
-                .padding(10)
-                .background(Color.white.opacity(0.7))
-                .cornerRadius(10)
+                .padding(10).background(Color.white.opacity(0.7)).cornerRadius(10)
 
-                if contacts.isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Kontakte werden geladen...").font(.subheadline).foregroundColor(.ncMuted)
-                    }.warmCard()
-                } else if let err = contacts.lastError {
+                if svc.isLoading {
+                    VStack(spacing: 12) { ProgressView(); Text("Kontakte laden...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+                } else if let err = svc.lastError {
                     VStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill").font(.title2).foregroundColor(.ncRed)
                         Text(err).font(.subheadline).foregroundColor(.ncRed)
                         Button("Berechtigung anfragen") {
-                            Task { await ServiceManager.shared.requestAll(); await contacts.fetchContacts() }
+                            Task { await ServiceManager.shared.requestAll(); await svc.fetchContacts() }
                         }.buttonStyle(.bordered).tint(.ncGreen)
                     }.warmCard()
-                } else if contacts.contacts.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "person.3.fill").font(.title2).foregroundColor(.ncSage).opacity(0.5)
-                        Text("Keine Kontakte gefunden.").font(.subheadline).foregroundColor(.ncMuted)
-                        Text("Stelle sicher, dass die App auf deine Kontakte zugreifen darf.").font(.caption).foregroundColor(.ncMuted)
-                    }.warmCard()
                 } else {
-                    let filtered = filteredContacts()
-                    ForEach(categorizedContacts(from: filtered), id: \.0) { category, catContacts in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(categoryLabel(category)).font(.headline.weight(.semibold)).foregroundColor(.ncDark).padding(.top, 4)
-                            ForEach(catContacts) { contact in
-                                ContactRow(contact: contact)
+                    // Upcoming Birthdays
+                    let bdays = svc.upcomingBirthdays
+                    if !bdays.isEmpty {
+                        socialSection("🎂 Geburtstage") {
+                            ForEach(bdays.prefix(5), id: \.0.id) { contact, days, date in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "star.fill").font(.caption).foregroundColor(.ncGold)
+                                    NavigationLink(destination: ContactDetailView(contact: contact)) {
+                                        Text(contact.fullName).font(.subheadline).foregroundColor(.ncDark)
+                                    }
+                                    Spacer()
+                                    Text(days == 0 ? "Heute!" : "in \(days) Tagen (\(date))")
+                                        .font(.caption).foregroundColor(days == 0 ? .ncRed : .ncMuted)
+                                }.padding(.vertical, 3)
                             }
                         }
+                    }
+
+                    // Reachout Due
+                    let due = svc.reachoutDue.prefix(5)
+                    if !due.isEmpty {
+                        socialSection("Kontakt fallig") {
+                            ForEach(Array(due)) { contact in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "bell.fill").font(.caption).foregroundColor(.ncRed)
+                                    NavigationLink(destination: ContactDetailView(contact: contact)) {
+                                        Text(contact.fullName).font(.subheadline).foregroundColor(.ncDark)
+                                    }
+                                    Spacer()
+                                    if let d = contact.daysSinceContacted {
+                                        Text("vor \(d) Tagen").font(.caption).foregroundColor(.ncMuted)
+                                    }
+                                }.padding(.vertical, 3)
+                            }
+                        }
+                    }
+
+                    // Categorized contacts
+                    let cats = svc.socialCategories()
+                    ForEach(cats, id: \.0) { key, items, label in
+                        socialSection(label) {
+                            let filtered = searchText.isEmpty ? items : items.filter {
+                                $0.fullName.lowercased().contains(searchText.lowercased()) ||
+                                ($0.organization ?? "").lowercased().contains(searchText.lowercased())
+                            }
+                            ForEach(filtered) { contact in
+                                NavigationLink(destination: ContactDetailView(contact: contact)) {
+                                    ContactRowView(contact: contact)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if svc.contacts.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "person.3.fill").font(.title2).foregroundColor(.ncSage).opacity(0.5)
+                            Text("Keine Kontakte gefunden.").font(.subheadline).foregroundColor(.ncMuted)
+                        }.warmCard()
                     }
                 }
 
@@ -255,82 +294,54 @@ struct RelationsDetailView: View {
         .warmBackground()
         .navigationTitle("Beziehungen")
         .navigationBarTitleDisplayMode(.large)
-        .task { await contacts.fetchContacts() }
+        .task { await svc.fetchContacts() }
     }
 
-    private func filteredContacts() -> [NAContact] {
-        if searchText.isEmpty { return contacts.contacts }
-        let q = searchText.lowercased()
-        return contacts.contacts.filter {
-            $0.fullName.lowercased().contains(q) ||
-            ($0.organization ?? "").lowercased().contains(q)
-        }
-    }
-
-    private func categorizedContacts(from list: [NAContact]) -> [(String, [NAContact])] {
-        let catOrder = ["arbeit", "familie", "freunde", "sonstiges"]
-        var dict: [String: [NAContact]] = [:]
-        for c in list {
-            let cat = c.category ?? guessCategory(c)
-            dict[cat, default: []].append(c)
-        }
-        return catOrder.compactMap { cat in
-            if let items = dict[cat], !items.isEmpty { return (cat, items) }
-            return nil
-        }
-    }
-
-    private func guessCategory(_ c: NAContact) -> String {
-        let org = (c.organization ?? "").lowercased()
-        if org.contains("gmbh") || org.contains("foodloop") || org.contains("naice") || org.contains("santos") { return "arbeit" }
-        return "sonstiges"
-    }
-
-    private func categoryLabel(_ cat: String) -> String {
-        switch cat {
-        case "arbeit": return "Arbeit"
-        case "familie": return "Familie"
-        case "freunde": return "Freunde"
-        default: return "Sonstiges"
-        }
+    func socialSection(_ title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline.weight(.semibold)).foregroundColor(.ncDark)
+            content()
+        }.warmCard()
     }
 }
 
-// MARK: - Contact Row
-struct ContactRow: View {
+// MARK: - Contact Row View
+struct ContactRowView: View {
     let contact: NAContact
+    var icon: String? = nil
+    var showActions: Bool = true
 
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(Color.ncGreen.opacity(0.15)).frame(width: 40, height: 40)
-                Text(initials).font(.system(size: 14, weight: .semibold)).foregroundColor(.ncGreen)
+                Text(contact.initials).font(.system(size: 14, weight: .semibold)).foregroundColor(.ncGreen)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(contact.fullName).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
                 if let org = contact.organization { Text(org).font(.caption).foregroundColor(.ncMuted) }
+                if let days = contact.daysSinceContacted {
+                    Text(days == 0 ? "Heute kontaktiert" : "vor \(days) Tagen")
+                        .font(.caption2).foregroundColor(contact.isReachoutDue ? .ncRed : .ncSage)
+                }
             }
             Spacer()
-            if let phone = contact.phoneNumbers.first {
-                HStack(spacing: 6) {
+            if showActions, let phone = contact.phoneNumbers.first {
+                HStack(spacing: 4) {
                     Button { NAContactService.shared.call(phone: phone) } label: {
                         Image(systemName: "phone.fill").font(.caption).foregroundColor(.ncGreen)
-                            .frame(width: 28, height: 28).background(Color.ncGreen.opacity(0.1)).cornerRadius(8)
+                            .frame(width: 24, height: 24).background(Color.ncGreen.opacity(0.1)).cornerRadius(6)
                     }
                     Button { NAContactService.shared.openWhatsApp(phone: phone) } label: {
                         Image(systemName: "message.fill").font(.caption).foregroundColor(.ncGreen)
-                            .frame(width: 28, height: 28).background(Color.ncGreen.opacity(0.1)).cornerRadius(8)
+                            .frame(width: 24, height: 24).background(Color.ncGreen.opacity(0.1)).cornerRadius(6)
                     }
                 }
             }
+            Image(systemName: "chevron.right").font(.caption2).foregroundColor(.ncSand)
         }
-        .padding(.vertical, 8).padding(.horizontal, 12)
-        .background(Color.white.opacity(0.6)).cornerRadius(10)
-    }
-
-    private var initials: String {
-        let parts = [contact.givenName.prefix(1), contact.familyName.prefix(1)]
-        return parts.filter { !$0.isEmpty }.map(String.init).joined()
+        .padding(.vertical, 6).padding(.horizontal, 8)
+        .background(Color.white.opacity(0.5)).cornerRadius(8)
     }
 }
 

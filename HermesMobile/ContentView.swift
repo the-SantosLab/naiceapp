@@ -98,7 +98,7 @@ struct NAIceTabView: View {
     @Bindable var authManager: AuthManager; let server: URL
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .home; @State private var ps: SharedImport?; @State private var pd: String?; @State private var pn: NewChatRequest?
-    @StateObject private var health = HealthManager.shared; @StateObject private var calendar = CalendarManager.shared; @StateObject private var services = ServiceManager.shared; @StateObject private var rollup = NARollupService.shared; @StateObject private var journal = NAJournalService.shared
+    @StateObject private var health = HealthManager.shared; @StateObject private var calendar = CalendarManager.shared; @StateObject private var services = ServiceManager.shared; @StateObject private var rollup = NARollupService.shared; @StateObject private var journal = NAJournalService.shared; @StateObject private var contacts = NAContactService.shared
     enum Tab: String, CaseIterable { case home; case life; case agent; case more
         var title: String { switch self { case .home: return "Home"; case .life: return "Leben"; case .agent: return "Agent"; case .more: return "Mehr" } }
         var icon: String { switch self { case .home: return "house"; case .life: return "leaf"; case .agent: return "bubble.left.and.bubble.right"; case .more: return "square.grid.2x2" } }
@@ -117,6 +117,7 @@ struct NAIceTabView: View {
                     await NAiceAPI.shared.fetchIdeas()
                     await NARollupService.shared.fetch()
                     await NAJournalService.shared.fetch()
+                    if ServiceManager.shared.contactsAuthorized { await NAContactService.shared.fetchContacts() }
                     await NASyncService.shared.syncAll(
                         moods: [],
                         habits: [],
