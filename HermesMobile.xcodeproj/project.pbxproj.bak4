@@ -330,8 +330,6 @@
 		D9327589D49ED4EC676438FA /* NARollupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAD6A4F60CF55B0BD8D7546 /* NARollupService.swift */; };
 		DAB04A05CDE42B1E2E445AB6 /* APIClient+AgentHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486FB27ABE466047F4F46E16 /* APIClient+AgentHub.swift */; };
 		FABF42A9AF3DB53F2D8877B9 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C390A8AFEC597A1528E6BD /* MoreView.swift */; };
-2DBAEFD981F848FC858D2114 /* NAJournalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587F223184FD4B8DAC13027A /* NAJournalService.swift */; };
-86F4CE29097B429AA3D60371 /* JournalCheckinCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5ACB472A3949B1B4D161F6 /* JournalCheckinCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -693,8 +691,6 @@
 		DA51F6C9BE72018CBD91F41D /* SleepBreakdownCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SleepBreakdownCard.swift; path = AgentHub/Cards/SleepBreakdownCard.swift; sourceTree = "<group>"; };
 		EE8A3B65E2196486BD26194A /* WorkoutScrollRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WorkoutScrollRow.swift; path = AgentHub/Cards/WorkoutScrollRow.swift; sourceTree = "<group>"; };
 		FC2A37872AC842629FBDDFA4 /* SlashCommandAutocompleteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandAutocompleteView.swift; sourceTree = "<group>"; };
-587F223184FD4B8DAC13027A /* NAJournalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NAJournalService.swift; path = NAJournalService.swift; sourceTree = "<group>"; };
-6B5ACB472A3949B1B4D161F6 /* JournalCheckinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JournalCheckinCard.swift; path = JournalCheckinCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1202,7 +1198,6 @@
 		7A3424C4FBF2F00FDC6201C4 /* Cards */ = {
 			isa = PBXGroup;
 			children = (
-				6B5ACB472A3949B1B4D161F6 /* JournalCheckinCard.swift */,
 				01AC42267845CE6609F75223 /* RecoveryCard.swift */,
 				DA51F6C9BE72018CBD91F41D /* SleepBreakdownCard.swift */,
 				EE8A3B65E2196486BD26194A /* WorkoutScrollRow.swift */,
@@ -1308,7 +1303,6 @@
 		C09300000000000000000010 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				587F223184FD4B8DAC13027A /* NAJournalService.swift */,
 				C09300000000000000000002 /* HapticButton.swift */,
 				C09500000000000000000002 /* AdaptiveGlassModifier.swift */,
 				C09500000000000000000006 /* AdaptiveGlassDebugFixture.swift */,
