@@ -58,25 +58,35 @@ struct AgentHubView: View {
                     }
                 }
 
-                // WHOOP Dashboard
-                if let w = rollup.whoop {
-                    NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit")
-                    VStack(alignment: .leading, spacing: 14) {
-                        recoveryRow(w)
-                        Divider().foregroundColor(.ncSand.opacity(0.3))
-                        sleepRow(w)
-                    }.warmCard()
-                } else if rollup.isLoading {
-                    VStack(spacing: 12) { ProgressView(); Text("Amelia wird geladen...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
-                } else {
-                    VStack(spacing: 10) {
-                        Image(systemName: "heart.slash").font(.title2).foregroundColor(.ncSand)
-                        Text("Keine WHOOP-Daten").font(.subheadline).foregroundColor(.ncMuted)
-                    }.warmCard()
-                }
+                // WHOOP Dashboard – Rollup (neu) or altes System (Fallback)
+            if let w = rollup.whoop {
+                NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit (Amelia)")
+                VStack(alignment: .leading, spacing: 14) {
+                    recoveryRow(w)
+                    Divider().foregroundColor(.ncSand.opacity(0.3))
+                    sleepRow(w)
+                }.warmCard()
+            } else if let w = NAiceAPI.shared.whoop, w.connected {
+                NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit")
+                VStack(alignment: .leading, spacing: 14) {
+                    RecoveryCard(whoop: w)
+                    Divider().foregroundColor(.ncSand.opacity(0.3))
+                    SleepBreakdownCard(whoop: w)
+                }.warmCard()
+            } else if rollup.isLoading || NAiceAPI.shared.isLoading {
+                VStack(spacing: 12) { ProgressView(); Text("Lade Gesundheitsdaten...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
+            } else {
+                VStack(spacing: 10) {
+                    Image(systemName: "heart.slash").font(.title2).foregroundColor(.ncSand)
+                    Text("Keine WHOOP-Daten verfugbar").font(.subheadline).foregroundColor(.ncMuted)
+                }.warmCard()
+            }
 
-                // Workouts vom Rollup
-                if let wo = rollup.whoop?.workouts, !wo.isEmpty {
+                // Workouts – Rollup or Fallback
+                let woData = rollup.whoop?.workouts ?? NAiceAPI.shared.whoop?.workouts.map { aw in
+                    NAWhoopWorkout(sport: aw.sport, strain: aw.strain, max_hr: aw.maxHr, avg_hr: aw.avgHr, kilojoule: aw.kilojoule, start: nil, end: nil)
+                }
+                if let wo = woData, !wo.isEmpty {
                     NAIceSectionLabel(icon: "figure.run", title: "Workouts")
                     workoutRow(Array(wo.prefix(3)))
                 }
@@ -148,7 +158,7 @@ struct AgentHubView: View {
                 // Sync Status
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
-                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? "–")").font(.system(size: 10)).foregroundColor(.ncMuted)
+                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP-Daten aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
                     Spacer()
                 }.padding(.horizontal, 4)
 
