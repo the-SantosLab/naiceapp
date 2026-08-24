@@ -5,7 +5,7 @@ import Foundation
 class NARollupService: ObservableObject {
     static let shared = NARollupService()
 
-    private let baseURL = URL(string: "https://health.santoslab.de/rollup/api/v2/rollup")!
+    private let baseURL = URL(string: "https://health.santoslab.de/api/naice/rollup")!
     private let authToken = "08732b...1bf2" // LOVABLE_API_KEY from naice-console
 
     @Published var rollup: NARollup? = nil
