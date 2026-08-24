@@ -9,11 +9,11 @@ struct AgentHubView: View {
     @State private var showIdea = false
     @State private var newIdea = ""
     @Binding var requestedNewChat: NewChatRequest?
+    @StateObject private var rollup = NARollupService.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // Greeting
                 greetingCard
 
                 // Chat mit Amelia
@@ -41,77 +41,114 @@ struct AgentHubView: View {
                     }
                 }.warmCard()
 
+                // Summary Flags (Amelia's Warnungen)
+                if !rollup.flags.isEmpty {
+                    ForEach(rollup.flags) { flag in
+                        HStack(spacing: 10) {
+                            Image(systemName: flag.level == "red" ? "exclamationmark.triangle.fill" : flag.level == "yellow" ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                                .foregroundColor(flag.level == "red" ? .ncRed : flag.level == "yellow" ? .ncGold : .ncGreen)
+                                .font(.title3)
+                            Text(flag.text).font(.subheadline).foregroundColor(.ncDark)
+                            Spacer()
+                        }
+                        .warmCard()
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(
+                            flag.level == "red" ? Color.ncRed.opacity(0.3) : flag.level == "yellow" ? Color.ncGold.opacity(0.3) : Color.ncGreen.opacity(0.3)
+                        ))
+                    }
+                }
+
                 // WHOOP Dashboard
-                if let w = NAiceAPI.shared.whoop, w.connected {
+                if let w = rollup.whoop {
                     NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit")
                     VStack(alignment: .leading, spacing: 14) {
-                        RecoveryCard(whoop: w)
+                        recoveryRow(w)
                         Divider().foregroundColor(.ncSand.opacity(0.3))
-                        SleepBreakdownCard(whoop: w)
+                        sleepRow(w)
                     }.warmCard()
-                } else if NAiceAPI.shared.isLoading {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("WHOOP wird geladen...").font(.subheadline).foregroundColor(.ncMuted)
-                    }.warmCard()
+                } else if rollup.isLoading {
+                    VStack(spacing: 12) { ProgressView(); Text("Amelia wird geladen...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "heart.slash").font(.title2).foregroundColor(.ncSand)
-                        Text("Keine WHOOP-Daten verfugbar").font(.subheadline).foregroundColor(.ncMuted)
+                        Text("Keine WHOOP-Daten").font(.subheadline).foregroundColor(.ncMuted)
                     }.warmCard()
                 }
 
-                // Workouts
-                if let w = NAiceAPI.shared.whoop, !w.workouts.isEmpty {
+                // Workouts vom Rollup
+                if let wo = rollup.whoop?.workouts, !wo.isEmpty {
                     NAIceSectionLabel(icon: "figure.run", title: "Workouts")
-                    WorkoutScrollRow(workouts: w.workouts, whoop: w)
-                        .warmCard().padding(0)
+                    workoutRow(Array(wo.prefix(3)))
                 }
 
-                // HealthKit
-                if HealthManager.shared.isAuthorized {
-                    NAIceSectionLabel(icon: "heart.fill", title: "HealthKit")
-                    VStack(spacing: 12) {
-                        HStack(spacing: 0) {
-                            mini("figure.walk", "\(HealthManager.shared.steps)", "Schritte")
-                            mini("heart.fill", "\(Int(HealthManager.shared.heartRate))", "Puls")
-                            mini("waveform.path.ecg", "\(Int(HealthManager.shared.hrv))ms", "HRV")
-                            mini("moon.fill", String(format: "%.1fh", HealthManager.shared.sleepHours), "Schlaf")
-                        }
+                // Business
+                if let b = rollup.business {
+                    NAIceSectionLabel(icon: "briefcase.fill", title: "Business")
+                    if let f = b.foodloop {
+                        bizCard("foodloop", f.total, f.hot ?? 0, f.statuses ?? [:])
+                    }
+                    if let n = b.naice {
+                        bizCard("nAIce", n.total, n.hot ?? 0, n.statuses ?? [:])
+                    }
+                }
+
+                // Deals
+                if let d = rollup.deals, d.active_deals > 0 {
+                    NAIceSectionLabel(icon: "eurosign", title: "Deals")
+                    HStack {
+                        Text("\(d.active_deals) aktive Deals").font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                        Spacer()
+                        Text("\(d.total_value_eur) €").font(.title3.weight(.bold)).foregroundColor(.ncGreen)
                     }.warmCard()
+                    ForEach(d.deals?.prefix(3) ?? []) { deal in
+                        HStack(spacing: 12) {
+                            Circle().fill(Color.ncGreen).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(deal.name).font(.subheadline.weight(.medium)).foregroundColor(.ncDark)
+                                Text(deal.status ?? "").font(.caption).foregroundColor(.ncMuted)
+                            }
+                            Spacer()
+                            Text("\(deal.value) €").font(.subheadline.weight(.bold)).foregroundColor(.ncGreen)
+                        }.warmCard()
+                    }
                 }
 
-                // Ideas
-                IdeasCard(
-                    showIdea: $showIdea,
-                    newIdea: $newIdea,
-                    ideas: NAiceAPI.shared.ideas,
-                    onSave: {
-                        guard !newIdea.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                        let t = newIdea; newIdea = ""; showIdea = false
-                        await NAiceAPI.shared.saveIdea(t)
+                // Tasks
+                if let t = rollup.tasks, t.active > 0 {
+                    NAIceSectionLabel(icon: "checklist", title: "Aufgaben")
+                    ForEach(t.tasks?.prefix(3) ?? []) { task in
+                        HStack(spacing: 12) {
+                            Image(systemName: task.priority == "high" ? "exclamationmark.circle.fill" : "circle")
+                                .foregroundColor(task.priority == "high" ? .ncRed : .ncSage)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(task.title).font(.subheadline).foregroundColor(.ncDark).lineLimit(2)
+                                if let d = task.deadline { Text("Frist: \(d)").font(.caption).foregroundColor(.ncMuted) }
+                            }
+                            Spacer()
+                        }.warmCard()
                     }
-                )
+                }
 
-                // Tag
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Dein Tag").font(.headline.weight(.semibold)).foregroundColor(.ncDark)
-                        Text(CalendarManager.shared.todayEvents.isEmpty
-                             ? "Keine Termine – Zeit fur deine Projekte"
-                             : "\(CalendarManager.shared.todayEvents.count) Termine heute")
-                            .font(.subheadline).foregroundColor(.ncMuted)
+                // Calendar
+                if let c = rollup.calendar, c.count > 0 {
+                    NAIceSectionLabel(icon: "calendar", title: "Termine")
+                    ForEach(c.events?.prefix(3) ?? []) { event in
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar.circle").font(.title3).foregroundColor(.ncSage)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(event.title).font(.subheadline).foregroundColor(.ncDark)
+                                if let s = event.start { Text(s).font(.caption).foregroundColor(.ncMuted) }
+                            }
+                            Spacer()
+                        }.warmCard()
                     }
-                    Spacer()
-                    Image(systemName: CalendarManager.shared.todayEvents.isEmpty ? "sun.max.fill" : "calendar.badge.checkmark")
-                        .foregroundColor(CalendarManager.shared.todayEvents.isEmpty ? .ncGold : .ncGreen)
-                        .font(.title2)
-                }.warmCard()
+                }
 
                 // Sync Status
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
-                    Text("Sync: \(NASyncService.shared.timeSinceLastSync)").font(.system(size: 10)).foregroundColor(.ncMuted)
+                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? "–")").font(.system(size: 10)).foregroundColor(.ncMuted)
                     Spacer()
                 }.padding(.horizontal, 4)
 
@@ -130,6 +167,7 @@ struct AgentHubView: View {
         .warmBackground()
         .navigationTitle("nAIce")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await rollup.fetch() }
     }
 
     private var greetingCard: some View {
@@ -145,4 +183,118 @@ struct AgentHubView: View {
             }
         }.warmCard()
     }
+
+    private func recoveryRow(_ w: NAWhoopRollup) -> some View {
+        Group {
+            if let r = w.recovery {
+                HStack {
+                    Text("Recovery").font(.subheadline).foregroundColor(.ncMuted)
+                    Spacer()
+                    Text("\(r.score)%").font(.title2.weight(.bold)).foregroundColor(r.score > 60 ? .ncGreen : .ncRed)
+                }
+                ProgressView(value: Double(r.score) / 100).tint(r.score > 60 ? .ncGreen : .ncRed)
+                HStack(spacing: 0) {
+                    mini("heart.fill", "\(r.rhr)", "Puls")
+                    mini("waveform.path.ecg", "\(r.hrv)ms", "HRV")
+                    if let s = r.spo2 { mini("drop.fill", "\(Int(s))%", "SpO2") }
+                }
+            }
+        }
+    }
+
+    private func sleepRow(_ w: NAWhoopRollup) -> some View {
+        Group {
+            if let s = w.sleep {
+                HStack {
+                    Text("Schlaf").font(.subheadline).foregroundColor(.ncMuted)
+                    Spacer()
+                    Text(String(format: "%.1fh", s.net_hours)).font(.title3.weight(.bold)).foregroundColor(.ncDark)
+                    if let e = s.efficiency_pct { Text("(\(Int(e))%)").font(.caption).foregroundColor(.ncMuted) }
+                }
+                // Sleep phases bar
+                if s.deep_minutes + s.rem_minutes + s.light_minutes + s.awake_minutes > 0 {
+                    let total = Double(s.deep_minutes + s.rem_minutes + s.light_minutes + s.awake_minutes)
+                    HStack(spacing: 3) {
+                        phaseBar(.ncDark, Double(s.deep_minutes) / total, "Deep")
+                        phaseBar(.ncGreen, Double(s.rem_minutes) / total, "REM")
+                        phaseBar(Color.ncSand.opacity(0.5), Double(s.light_minutes) / total, "Light")
+                        phaseBar(.ncRed.opacity(0.3), Double(s.awake_minutes) / total, "Awake")
+                    }
+                    HStack {
+                        leg("Deep", Color.ncDark); leg("REM", Color.ncGreen)
+                        leg("Light", Color.ncSand.opacity(0.5)); leg("Awake", Color.ncRed.opacity(0.3))
+                    }
+                }
+                if let w = w.cycle {
+                    HStack {
+                        Text("Strain: \(String(format: "%.1f", w.strain ?? 0))").font(.caption).foregroundColor(.ncMuted)
+                        Spacer()
+                        if let avg = w.avg_hr { Text("Puls Ø: \(avg)").font(.caption).foregroundColor(.ncMuted) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func workoutRow(_ workouts: [NAWhoopWorkout]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(workouts.indices, id: \.self) { i in
+                    let wo = workouts[i]
+                    VStack(spacing: 6) {
+                        Image(systemName: sportIcon(wo.sport)).font(.title2).foregroundColor(.ncGreen)
+                        Text(wo.sport.capitalized).font(.caption).foregroundColor(.ncDark)
+                        HStack(spacing: 2) {
+                            Image(systemName: "bolt.fill").font(.system(size: 8)).foregroundColor(.ncGold)
+                            Text(String(format: "%.1f", wo.strain)).font(.caption2.weight(.semibold)).foregroundColor(.ncDark)
+                        }
+                    }
+                    .frame(width: 72, height: 80)
+                    .background(Color.ncPaper, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.ncSand.opacity(0.4)))
+                }
+            }.padding(.horizontal, 4)
+        }
+    }
+
+    private func bizCard(_ name: String, _ total: Int, _ hot: Int, _ statuses: [String: Int]) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: name == "foodloop" ? "fork.knife" : "brain.head.profile")
+                .font(.title3).foregroundColor(.ncSage).frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name.capitalized).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                Text("\(total) Kontakte · \(hot) heiss").font(.caption).foregroundColor(.ncMuted)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundColor(.ncSand)
+        }.warmCard()
+    }
+
+    private func phaseBar(_ color: Color, _ pct: Double, _ label: String) -> some View {
+        RoundedRectangle(cornerRadius: 3).fill(color).frame(height: 12)
+            .frame(maxWidth: pct > 0.01 ? .infinity : 0)
+    }
+
+    private func leg(_ t: String, _ c: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(c).frame(width: 6, height: 6)
+            Text(t).font(.system(size: 9)).foregroundColor(.ncMuted)
+        }
+    }
+
+    private func sportIcon(_ s: String) -> String {
+        switch s.lowercased() {
+        case "walking": return "figure.walk"
+        case "running": return "figure.run"
+        case "cycling": return "bicycle"
+        case "swimming": return "figure.pool.swim"
+        case "fitness": return "dumbbell.fill"
+        case "yoga": return "figure.mind.and.body"
+        default: return "figure.mixed.cardio"
+        }
+    }
+}
+
+extension NACalendarEvent: Identifiable {
+    var id: String { title }
 }
