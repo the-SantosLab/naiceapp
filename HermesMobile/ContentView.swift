@@ -98,19 +98,20 @@ struct NAIceTabView: View {
     @Bindable var authManager: AuthManager; let server: URL
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: Tab = .home; @State private var ps: SharedImport?; @State private var pd: String?; @State private var pn: NewChatRequest?
-    @StateObject private var health = HealthManager.shared; @StateObject private var calendar = CalendarManager.shared; @StateObject private var services = ServiceManager.shared; @StateObject private var rollup = NARollupService.shared; @StateObject private var journal = NAJournalService.shared; @StateObject private var contacts = NAContactService.shared
-    enum Tab: String, CaseIterable { case home; case life; case agent; case more
-        var title: String { switch self { case .home: return "Home"; case .life: return "Leben"; case .agent: return "Agent"; case .more: return "Mehr" } }
-        var icon: String { switch self { case .home: return "house"; case .life: return "leaf"; case .agent: return "bubble.left.and.bubble.right"; case .more: return "square.grid.2x2" } }
+    @StateObject private var health = HealthManager.shared; @StateObject private var calendar = CalendarManager.shared; @StateObject private var services = ServiceManager.shared; @StateObject private var rollup = NARollupService.shared; @StateObject private var journal = NAJournalService.shared; @StateObject private var contacts = NAContactService.shared; @StateObject private var waVM = WhatsAppViewModel.shared
+    enum Tab: String, CaseIterable { case home; case life; case agent; case whatsapp; case more
+        var title: String { switch self { case .home: return "Home"; case .life: return "Leben"; case .agent: return "Agent"; case .whatsapp: return "WhatsApp"; case .more: return "Mehr" } }
+        var icon: String { switch self { case .home: return "house"; case .life: return "leaf"; case .agent: return "bubble.left.and.bubble.right"; case .whatsapp: return "message.badge.waveform.fill"; case .more: return "square.grid.2x2" } }
     }
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack { AgentHubView(requestedNewChat: $pn) }.tabItem { Label(Tab.home.title, systemImage: Tab.home.icon) }.tag(Tab.home)
             NavigationStack { NAIceLifeView(services: services) }.tabItem { Label(Tab.life.title, systemImage: Tab.life.icon) }.tag(Tab.life)
             SessionListView(authManager: authManager, server: server, pendingSharedImport: $ps, pendingDeepLinkedSessionID: $pd, requestedNewChat: $pn).tabItem { Label(Tab.agent.title, systemImage: Tab.agent.icon) }.tag(Tab.agent)
+            NavigationStack { WhatsAppView() }.tabItem { Label(Tab.whatsapp.title, systemImage: Tab.whatsapp.icon) }.badge(waVM.totalUnread > 0 ? waVM.totalUnread : 0).tag(Tab.whatsapp)
             NavigationStack { NAIceMoreView() }.tabItem { Label(Tab.more.title, systemImage: Tab.more.icon) }.tag(Tab.more)
-        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await NAiceAPI.shared.fetchWhoop(); await NAiceAPI.shared.fetchIdeas(); await NARollupService.shared.fetch() }
-            .onChange(of: scenePhase) { _, newPhase in
+        }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await NAiceAPI.shared.fetchWhoop(); await NAiceAPI.shared.fetchIdeas(); await NARollupService.shared.fetch(); await waVM.fetchPending() }
+            .onChange(of: scenePhase, perform: { newPhase in
                 guard newPhase == .active else { return }
                 Task {
                     await NAiceAPI.shared.fetchWhoop()
@@ -125,8 +126,9 @@ struct NAIceTabView: View {
                         health: health,
                         whoop: NAiceAPI.shared.whoop
                     )
+                    await waVM.fetchPending()
                 }
-            }
+            })
     }
 }
 
