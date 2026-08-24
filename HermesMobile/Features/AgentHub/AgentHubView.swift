@@ -160,7 +160,18 @@ struct AgentHubView: View {
                     Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
                     Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP-Daten aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
                     Spacer()
+                    if rollup.isLoading {
+                        ProgressView().scaleEffect(0.6)
+                    }
                 }.padding(.horizontal, 4)
+
+                if let err = rollup.lastError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundColor(.ncRed)
+                        Text(err).font(.system(size: 10)).foregroundColor(.ncRed)
+                        Spacer()
+                    }.padding(.horizontal, 4)
+                }
 
                 // Lebensbereiche
                 NAIceSectionLabel(icon: "square.grid.2x2", title: "Meine Bereiche")
