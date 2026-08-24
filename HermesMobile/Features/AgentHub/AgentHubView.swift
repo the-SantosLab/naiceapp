@@ -9,6 +9,7 @@ struct AgentHubView: View {
     @State private var showIdea = false
     @State private var newIdea = ""
     @Binding var requestedNewChat: NewChatRequest?
+    @ObservedObject private var rollup = NARollupService.shared
 
     var body: some View {
         ScrollView {
@@ -41,8 +42,8 @@ struct AgentHubView: View {
                 }.warmCard()
 
                 // Summary Flags (Amelia's Warnungen)
-                if !NARollupService.shared.flags.isEmpty {
-                    ForEach(NARollupService.shared.flags) { flag in
+                if !rollup.flags.isEmpty {
+                    ForEach(rollup.flags) { flag in
                         HStack(spacing: 10) {
                             Image(systemName: flag.level == "red" ? "exclamationmark.triangle.fill" : flag.level == "yellow" ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                                 .foregroundColor(flag.level == "red" ? .ncRed : flag.level == "yellow" ? .ncGold : .ncGreen)
@@ -58,7 +59,7 @@ struct AgentHubView: View {
                 }
 
                 // WHOOP Dashboard – Rollup (neu) or altes System (Fallback)
-                if let w = NARollupService.shared.whoop {
+                if let w = rollup.whoop {
                     NAIceSectionLabel(icon: "heart.circle.fill", title: "Gesundheit (Amelia)")
                     VStack(alignment: .leading, spacing: 14) {
                         recoveryRow(w)
@@ -72,7 +73,7 @@ struct AgentHubView: View {
                         Divider().foregroundColor(.ncSand.opacity(0.3))
                         SleepBreakdownCard(whoop: w)
                     }.warmCard()
-                } else if NARollupService.shared.isLoading || NAiceAPI.shared.isLoading {
+                } else if rollup.isLoading || NAiceAPI.shared.isLoading {
                     VStack(spacing: 12) { ProgressView(); Text("Lade Gesundheitsdaten...").font(.subheadline).foregroundColor(.ncMuted) }.warmCard()
                 } else {
                     VStack(spacing: 10) {
@@ -82,7 +83,7 @@ struct AgentHubView: View {
                 }
 
                 // Workouts – Rollup or Fallback
-                let woData = NARollupService.shared.whoop?.workouts ?? NAiceAPI.shared.whoop?.workouts.map { aw in
+                let woData = rollup.whoop?.workouts ?? NAiceAPI.shared.whoop?.workouts.map { aw in
                     NAWhoopWorkout(sport: aw.sport, strain: aw.strain, max_hr: aw.maxHr, avg_hr: aw.avgHr, kilojoule: aw.kilojoule, start: nil, end: nil)
                 }
                 if let wo = woData, !wo.isEmpty {
@@ -91,7 +92,7 @@ struct AgentHubView: View {
                 }
 
                 // Business
-                if let b = NARollupService.shared.business {
+                if let b = rollup.business {
                     NAIceSectionLabel(icon: "briefcase.fill", title: "Business")
                     if let f = b.foodloop {
                         bizCard("foodloop", f.total, f.hot ?? 0, f.statuses ?? [:])
@@ -102,7 +103,7 @@ struct AgentHubView: View {
                 }
 
                 // Deals
-                if let d = NARollupService.shared.deals, d.active_deals > 0 {
+                if let d = rollup.deals, d.active_deals > 0 {
                     NAIceSectionLabel(icon: "eurosign", title: "Deals")
                     HStack {
                         Text("\(d.active_deals) aktive Deals").font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
@@ -123,7 +124,7 @@ struct AgentHubView: View {
                 }
 
                 // Tasks
-                if let t = NARollupService.shared.tasks, t.active > 0 {
+                if let t = rollup.tasks, t.active > 0 {
                     NAIceSectionLabel(icon: "checklist", title: "Aufgaben")
                     ForEach(t.tasks?.prefix(3) ?? []) { task in
                         HStack(spacing: 12) {
@@ -140,7 +141,7 @@ struct AgentHubView: View {
                 }
 
                 // Calendar
-                if let c = NARollupService.shared.calendar, c.count > 0 {
+                if let c = rollup.calendar, c.count > 0 {
                     NAIceSectionLabel(icon: "calendar", title: "Termine")
                     ForEach(c.events?.prefix(3) ?? []) { event in
                         HStack(spacing: 12) {
@@ -157,7 +158,7 @@ struct AgentHubView: View {
                 // Sync Status
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
-                    Text("Rollup: \(NARollupService.shared.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP-Daten aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
+                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP-Daten aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
                     Spacer()
                 }.padding(.horizontal, 4)
 
@@ -176,6 +177,7 @@ struct AgentHubView: View {
         .warmBackground()
         .navigationTitle("nAIce")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await rollup.fetch() }
     }
 
     private var greetingCard: some View {

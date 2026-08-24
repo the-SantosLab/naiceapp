@@ -2,16 +2,15 @@ import Foundation
 
 // MARK: - Rollup Service (console.naice.app/api/v2/rollup)
 @MainActor
-@Observable
-class NARollupService {
+class NARollupService: ObservableObject {
     static let shared = NARollupService()
 
     private let baseURL = URL(string: "https://console.naice.app/api/v2/rollup")!
     private let authToken = "08732b...1bf2" // LOVABLE_API_KEY from naice-console
 
-    var rollup: NARollup?
-    var isLoading = false
-    var lastError: String?
+    @Published var rollup: NARollup? = nil
+    @Published var isLoading = false
+    @Published var lastError: String? = nil
 
     func fetch() async {
         isLoading = true
@@ -32,12 +31,14 @@ class NARollupService {
 
         do {
             let decoder = JSONDecoder()
-            rollup = try decoder.decode(NARollup.self, from: data)
-            isLoading = false
+            let decoded = try decoder.decode(NARollup.self, from: data)
+            self.rollup = decoded
+            self.isLoading = false
+            print("[Rollup]✅ Erfolg: \(decoded.business?.foodloop?.total ?? 0) foodloop, \(decoded.deals?.active_deals ?? 0) deals")
         } catch {
-            lastError = "Dekodierung fehlgeschlagen: \(error.localizedDescription)"
-            isLoading = false
-            print("[Rollup] Decode error: \(error)")
+            self.lastError = "Dekodierung: \(error.localizedDescription)"
+            self.isLoading = false
+            print("[Rollup]❌ Decode Error: \(error)")
         }
     }
 
