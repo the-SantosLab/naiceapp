@@ -3,11 +3,10 @@ import SwiftUI
 // MARK: - WhatsApp Main View
 struct WhatsAppView: View {
     @ObservedObject private var vm = WhatsAppViewModel.shared
-    @State private var selectedChat: WAChatItem?
 
     var body: some View {
-        NavigationSplitView {
-            mainList
+        NavigationStack {
+            mainContent
                 .navigationTitle("WhatsApp")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -22,28 +21,21 @@ struct WhatsAppView: View {
                     }
                 }
                 .refreshable { await vm.fetchPending() }
-        } detail: {
-            if let chat = selectedChat {
-                WhatsAppChatDetailView(chat: chat)
-            } else {
-                Text("Chat auswahlen").foregroundColor(.ncMuted)
-            }
+                .task {
+                    vm.startAutoRefresh()
+                    await vm.fetchPending()
+                    await vm.fetchStatus()
+                }
+                .onDisappear { vm.stopAutoRefresh() }
         }
-        .warmBackground()
-        .task {
-            vm.startAutoRefresh()
-            await vm.fetchPending()
-            await vm.fetchStatus()
-        }
-        .onDisappear { vm.stopAutoRefresh() }
     }
 
     @ViewBuilder
-    private var mainList: some View {
+    private var mainContent: some View {
         if let err = vm.lastError, vm.pendingBusiness.isEmpty, vm.pendingPrivat.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 Spacer()
-                Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundColor(.ncRed)
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 48)).foregroundColor(.ncRed)
                 Text("WhatsApp nicht verbunden").font(.headline).foregroundColor(.ncDark)
                 Text(err).font(.subheadline).foregroundColor(.ncMuted).multilineTextAlignment(.center)
                 Button("Erneut versuchen") {
@@ -52,7 +44,8 @@ struct WhatsAppView: View {
                 .buttonStyle(.bordered).tint(.ncGreen)
                 Spacer()
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.ncPaper)
         } else {
             List {
                 if vm.allDone {
@@ -68,11 +61,11 @@ struct WhatsAppView: View {
                 }
 
                 // Business section
-                if !vm.pendingBusiness.isEmpty {
+                let unrepliedBusiness = vm.pendingBusiness.filter { !$0.replied }
+                    .sorted { $0.lastIncomingTs < $1.lastIncomingTs }
+                if !unrepliedBusiness.isEmpty {
                     Section {
-                        let unrepliedBusiness = vm.pendingBusiness.filter { !$0.replied }
-                        let sortedBusiness = unrepliedBusiness.sorted { $0.lastIncomingTs < $1.lastIncomingTs }
-                        ForEach(sortedBusiness) { chat in
+                        ForEach(unrepliedBusiness) { chat in
                             let item = WAChatItem(
                                 remoteJid: chat.remoteJid ?? chat.id,
                                 contact: chat.contact,
@@ -81,7 +74,7 @@ struct WhatsAppView: View {
                                 replied: chat.replied,
                                 session: "business"
                             )
-                            NavigationLink(value: item) {
+                            NavigationLink(destination: WhatsAppChatDetailView(chat: item)) {
                                 ChatRowView(chat: item)
                             }
                         }
@@ -92,11 +85,11 @@ struct WhatsAppView: View {
                 }
 
                 // Privat section
-                if !vm.pendingPrivat.isEmpty {
+                let unrepliedPrivat = vm.pendingPrivat.filter { !$0.replied }
+                    .sorted { $0.lastIncomingTs < $1.lastIncomingTs }
+                if !unrepliedPrivat.isEmpty {
                     Section {
-                        let unrepliedPrivat = vm.pendingPrivat.filter { !$0.replied }
-                        let sortedPrivat = unrepliedPrivat.sorted { $0.lastIncomingTs < $1.lastIncomingTs }
-                        ForEach(sortedPrivat) { chat in
+                        ForEach(unrepliedPrivat) { chat in
                             let item = WAChatItem(
                                 remoteJid: chat.remoteJid ?? chat.id,
                                 contact: chat.contact,
@@ -105,7 +98,7 @@ struct WhatsAppView: View {
                                 replied: chat.replied,
                                 session: "privat"
                             )
-                            NavigationLink(value: item) {
+                            NavigationLink(destination: WhatsAppChatDetailView(chat: item)) {
                                 ChatRowView(chat: item)
                             }
                         }
@@ -115,8 +108,9 @@ struct WhatsAppView: View {
                     }
                 }
 
-                if vm.isLoading {
-                    ForEach(0..<3) { _ in
+                // Loading shimmer
+                if vm.isLoading && vm.pendingBusiness.isEmpty && vm.pendingPrivat.isEmpty {
+                    ForEach(0..<3, id: \.self) { _ in
                         ChatRowPlaceholder()
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
@@ -125,9 +119,6 @@ struct WhatsAppView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .navigationDestination(for: WAChatItem.self) { chat in
-                WhatsAppChatDetailView(chat: chat)
-            }
         }
     }
 }
