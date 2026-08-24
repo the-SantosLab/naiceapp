@@ -105,14 +105,25 @@ struct NAIceTabView: View {
     }
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationStack { AgentHubView() }.tabItem { Label(Tab.home.title, systemImage: Tab.home.icon) }.tag(Tab.home)
+            NavigationStack { AgentHubView(requestedNewChat: $pn) }.tabItem { Label(Tab.home.title, systemImage: Tab.home.icon) }.tag(Tab.home)
             NavigationStack { NAIceLifeView(services: services) }.tabItem { Label(Tab.life.title, systemImage: Tab.life.icon) }.tag(Tab.life)
             SessionListView(authManager: authManager, server: server, pendingSharedImport: $ps, pendingDeepLinkedSessionID: $pd, requestedNewChat: $pn).tabItem { Label(Tab.agent.title, systemImage: Tab.agent.icon) }.tag(Tab.agent)
             NavigationStack { NAIceMoreView() }.tabItem { Label(Tab.more.title, systemImage: Tab.more.icon) }.tag(Tab.more)
         }.tint(Color.ncGreen).task { await health.requestAuth(); await calendar.requestAuth(); await services.requestAll(); await NAiceAPI.shared.fetchWhoop(); await NAiceAPI.shared.fetchIdeas() }
-            .onChange(of: scenePhase) { newPhase in
+            .onChange(of: scenePhase) { _, newPhase in
                 guard newPhase == .active else { return }
-                Task { await NAiceAPI.shared.fetchWhoop(); await NAiceAPI.shared.fetchIdeas() }
+                Task {
+                    await NAiceAPI.shared.fetchWhoop()
+                    await NAiceAPI.shared.fetchIdeas()
+                    // Phase B: Sync local data to backend (HealthKit + Whoop)
+                    await NASyncService.shared.syncAll(
+                        moods: [],
+                        habits: [],
+                        expenses: [],
+                        health: health,
+                        whoop: NAiceAPI.shared.whoop
+                    )
+                }
             }
     }
 }

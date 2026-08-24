@@ -3,15 +3,43 @@ import SwiftData
 
 struct AgentHubView: View {
     @Query(sort: \MoodEntry.date, order: .reverse) var moods: [MoodEntry]
+    @Query(sort: \HabitLog.date, order: .reverse) var habits: [HabitLog]
+    @Query(sort: \Expense.date, order: .reverse) var expenses: [Expense]
     @Environment(\.modelContext) var mc
     @State private var showIdea = false
     @State private var newIdea = ""
+    @Binding var requestedNewChat: NewChatRequest?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 // Greeting
                 greetingCard
+
+                // Chat mit Amelia
+                Button {
+                    let context = NAContextBuilder.buildContext(
+                        moods: moods, habits: habits, expenses: expenses,
+                        health: HealthManager.shared,
+                        calendar: CalendarManager.shared,
+                        whoop: NAiceAPI.shared.whoop
+                    )
+                    requestedNewChat = NewChatRequest(
+                        profileName: "santos-copilot",
+                        initialDraft: context
+                    )
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "message.fill").font(.title3).foregroundColor(.white)
+                            .frame(width: 36, height: 36).background(Color.ncGreen, in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mit Amelia chatten").font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                            Text("App-Kontext wird mitgesendet").font(.caption).foregroundColor(.ncMuted)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundColor(.ncSand)
+                    }
+                }.warmCard()
 
                 // WHOOP Dashboard
                 if let w = NAiceAPI.shared.whoop, w.connected {
@@ -79,6 +107,13 @@ struct AgentHubView: View {
                         .foregroundColor(CalendarManager.shared.todayEvents.isEmpty ? .ncGold : .ncGreen)
                         .font(.title2)
                 }.warmCard()
+
+                // Sync Status
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
+                    Text("Sync: \(NASyncService.shared.timeSinceLastSync)").font(.system(size: 10)).foregroundColor(.ncMuted)
+                    Spacer()
+                }.padding(.horizontal, 4)
 
                 // Lebensbereiche
                 NAIceSectionLabel(icon: "square.grid.2x2", title: "Meine Bereiche")

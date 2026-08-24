@@ -1195,6 +1195,7 @@ struct SessionListView: View {
         requestedNewChat = nil
         navigationState.select(
             PendingNewChatRoute(
+                initialDraft: request.initialDraft,
                 autoStartsVoiceInput: request.autoStartsVoiceInput,
                 profileName: request.profileName
             )
@@ -1286,14 +1287,14 @@ struct HermesHeaderLogo: View {
 struct NewChatRequest: Equatable {
     let id: UUID
     let autoStartsVoiceInput: Bool
-    /// When set, the new session is created pinned to this profile; nil uses the server's
-    /// active profile (the plain "+" / "New Chat" behavior).
     let profileName: String?
+    let initialDraft: String
 
-    init(autoStartsVoiceInput: Bool = false, profileName: String? = nil) {
+    init(autoStartsVoiceInput: Bool = false, profileName: String? = nil, initialDraft: String = "") {
         self.id = UUID()
         self.autoStartsVoiceInput = autoStartsVoiceInput
         self.profileName = profileName
+        self.initialDraft = initialDraft
     }
 }
 
