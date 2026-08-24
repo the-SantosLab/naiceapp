@@ -5,7 +5,7 @@ import Foundation
 class NARollupService: ObservableObject {
     static let shared = NARollupService()
 
-    private let baseURL = URL(string: "https://health.santoslab.de/api/naice/rollup")!
+    private let baseURL = URL(string: "https://health.santoslab.de/api/rollup")!
 
     @Published var rollup: NARollup? = nil
     @Published var isLoading = false
