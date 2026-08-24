@@ -75,7 +75,7 @@ struct HealthDetailView: View {
 
 // MARK: - Work Detail View
 struct WorkDetailView: View {
-    @StateObject private var rollup = NARollupService.shared
+    @ObservedObject private var rollup = NARollupService.shared
 
     var body: some View {
         ScrollView {
