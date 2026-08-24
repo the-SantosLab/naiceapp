@@ -6,7 +6,6 @@ class NARollupService: ObservableObject {
     static let shared = NARollupService()
 
     private let baseURL = URL(string: "https://health.santoslab.de/api/naice/rollup")!
-    private let authToken = "08732b...1bf2" // LOVABLE_API_KEY from naice-console
 
     @Published var rollup: NARollup? = nil
     @Published var isLoading = false
@@ -17,8 +16,7 @@ class NARollupService: ObservableObject {
         lastError = nil
 
         var req = URLRequest(url: baseURL)
-        req.setValue(authToken, forHTTPHeaderField: "x-auth-token")
-        req.timeoutInterval = 15
+        req.timeoutInterval = 30
 
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               let http = resp as? HTTPURLResponse,
