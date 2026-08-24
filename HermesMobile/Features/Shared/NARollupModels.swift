@@ -48,6 +48,7 @@ struct NAWhoopSleep: Codable {
 struct NAWhoopCycle: Codable {
     let strain: Double?
     let kilojoule: Double?
+    let kcal: Double?
     let avg_hr: Int?
     let max_hr: Int?
 }
@@ -64,7 +65,8 @@ struct NAWhoopWorkout: Codable {
     let strain: Double
     let max_hr: Int?
     let avg_hr: Int?
-    let kilojoule: Double?
+    let kj: Double?
+    let kcal: Double?
     let start: String?
     let end: String?
 }

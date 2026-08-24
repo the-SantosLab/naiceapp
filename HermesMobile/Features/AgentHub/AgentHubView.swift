@@ -84,7 +84,7 @@ struct AgentHubView: View {
 
                 // Workouts – Rollup or Fallback
                 let woData = rollup.whoop?.workouts ?? NAiceAPI.shared.whoop?.workouts.map { aw in
-                    NAWhoopWorkout(sport: aw.sport, strain: aw.strain, max_hr: aw.maxHr, avg_hr: aw.avgHr, kilojoule: aw.kilojoule, start: nil, end: nil)
+                    NAWhoopWorkout(sport: aw.sport, strain: aw.strain, max_hr: aw.maxHr, avg_hr: aw.avgHr, kj: aw.kilojoule, kcal: nil, start: nil, end: nil)
                 }
                 if let wo = woData, !wo.isEmpty {
                     NAIceSectionLabel(icon: "figure.run", title: "Workouts")
