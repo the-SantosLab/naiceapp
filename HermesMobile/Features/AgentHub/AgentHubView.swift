@@ -14,7 +14,26 @@ struct AgentHubView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                // Greeting with refresh button
                 greetingCard
+
+                // Letzter Sync
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
+                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
+                    Spacer()
+                    if rollup.isLoading {
+                        ProgressView().scaleEffect(0.6)
+                    }
+                }.padding(.horizontal, 4)
+
+                if let err = rollup.lastError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundColor(.ncRed)
+                        Text(err).font(.system(size: 10)).foregroundColor(.ncRed)
+                        Spacer()
+                    }.padding(.horizontal, 4)
+                }
 
                 // Chat mit Amelia
                 Button {
@@ -155,24 +174,6 @@ struct AgentHubView: View {
                     }
                 }
 
-                // Sync Status
-                HStack {
-                    Image(systemName: "arrow.triangle.2.circlepath").font(.caption).foregroundColor(.ncSage)
-                    Text("Rollup: \(rollup.rollup?.ts.prefix(16) ?? (NAiceAPI.shared.whoop != nil ? "WHOOP-Daten aktiv" : "–"))").font(.system(size: 10)).foregroundColor(.ncMuted)
-                    Spacer()
-                    if rollup.isLoading {
-                        ProgressView().scaleEffect(0.6)
-                    }
-                }.padding(.horizontal, 4)
-
-                if let err = rollup.lastError {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundColor(.ncRed)
-                        Text(err).font(.system(size: 10)).foregroundColor(.ncRed)
-                        Spacer()
-                    }.padding(.horizontal, 4)
-                }
-
                 // Lebensbereiche
                 NAIceSectionLabel(icon: "square.grid.2x2", title: "Meine Bereiche")
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -188,7 +189,15 @@ struct AgentHubView: View {
         .warmBackground()
         .navigationTitle("nAIce")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await rollup.fetch() }
+        .refreshable { await refreshAll() }
+        .task { await refreshAll() }
+    }
+
+    private func refreshAll() async {
+        await NAiceAPI.shared.fetchWhoop()
+        await NAiceAPI.shared.fetchIdeas()
+        await rollup.fetch()
+        await NAJournalService.shared.fetch()
     }
 
     private var greetingCard: some View {
@@ -201,6 +210,10 @@ struct AgentHubView: View {
                     Text(timeGreeting()).font(.subheadline).foregroundColor(.ncMuted)
                 }
                 Spacer()
+                Button { Task { await refreshAll() } } label: {
+                    Image(systemName: "arrow.clockwise").font(.title3).foregroundColor(.ncSage)
+                }
+                .disabled(rollup.isLoading || NAiceAPI.shared.isLoading)
             }
         }.warmCard()
     }

@@ -115,7 +115,8 @@ struct NAIceTabView: View {
                 Task {
                     await NAiceAPI.shared.fetchWhoop()
                     await NAiceAPI.shared.fetchIdeas()
-                    // Phase B: Sync local data to backend (HealthKit + Whoop)
+                    await NARollupService.shared.fetch()
+                    await NAJournalService.shared.fetch()
                     await NASyncService.shared.syncAll(
                         moods: [],
                         habits: [],
