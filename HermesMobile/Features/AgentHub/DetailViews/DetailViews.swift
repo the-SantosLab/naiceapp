@@ -195,6 +195,7 @@ struct WorkDetailView: View {
 // MARK: - Relations Detail View
 struct RelationsDetailView: View {
     @ObservedObject private var svc = NAContactService.shared
+    @ObservedObject private var waVM = WhatsAppViewModel.shared
     @State private var searchText = ""
 
     var body: some View {
@@ -258,6 +259,35 @@ struct RelationsDetailView: View {
                         }
                     }
 
+                    // WhatsApp pending
+                    let unrepliedChats = waVM.unrepliedChats.prefix(10)
+                    if !unrepliedChats.isEmpty {
+                        socialSection("WhatsApp offen") {
+                            ForEach(Array(unrepliedChats)) { chat in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "message.fill").font(.caption).foregroundColor(.ncGreen)
+                                    NavigationLink(destination: WhatsAppChatDetailView(chat: chat)) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(chat.contact).font(.subheadline.weight(.semibold)).foregroundColor(.ncDark)
+                                            if let text = chat.lastIncomingText {
+                                                Text(text).font(.caption).foregroundColor(.ncMuted).lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        if chat.urgency == .red {
+                                            Circle().fill(Color.ncRed).frame(width: 8, height: 8)
+                                        } else if chat.urgency == .yellow {
+                                            Circle().fill(Color.ncGold).frame(width: 8, height: 8)
+                                        }
+                                        Text(chat.timeAgo).font(.caption2).foregroundColor(.ncMuted)
+                                    }
+                                }.padding(.vertical, 3)
+                            }
+                        }
+                    }
+
                     // Categorized contacts
                     let cats = svc.socialCategories()
                     ForEach(cats, id: \.0) { key, items, label in
@@ -294,7 +324,7 @@ struct RelationsDetailView: View {
         .warmBackground()
         .navigationTitle("Beziehungen")
         .navigationBarTitleDisplayMode(.large)
-        .task { await svc.fetchContacts() }
+        .task { await svc.fetchContacts(); waVM.startAutoRefresh(); await waVM.fetchPending() }
     }
 
     func socialSection(_ title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
