@@ -2,15 +2,16 @@ import Foundation
 
 // MARK: - Rollup Service (console.naice.app/api/v2/rollup)
 @MainActor
-class NARollupService: ObservableObject {
+@Observable
+class NARollupService {
     static let shared = NARollupService()
 
     private let baseURL = URL(string: "https://console.naice.app/api/v2/rollup")!
     private let authToken = "08732b...1bf2" // LOVABLE_API_KEY from naice-console
 
-    @Published var rollup: NARollup?
-    @Published var isLoading = false
-    @Published var lastError: String?
+    var rollup: NARollup?
+    var isLoading = false
+    var lastError: String?
 
     func fetch() async {
         isLoading = true
@@ -47,6 +48,5 @@ class NARollupService: ObservableObject {
     var summary: NASummary? { rollup?.summary }
     var journal: NAJournalRollup? { rollup?.journal }
     var calendar: NACalendarRollup? { rollup?.calendar }
-
     var flags: [NASummaryFlag] { summary?.flags ?? [] }
 }

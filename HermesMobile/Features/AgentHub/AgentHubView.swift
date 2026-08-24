@@ -176,7 +176,6 @@ struct AgentHubView: View {
         .warmBackground()
         .navigationTitle("nAIce")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await NARollupService.shared.fetch() }
     }
 
     private var greetingCard: some View {
