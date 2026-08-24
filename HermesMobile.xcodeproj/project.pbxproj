@@ -116,6 +116,7 @@
 		5417A7400000000000000092 /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = 5417A7400000000000000091 /* SwiftMath */; };
 		56063D74CA7FC2BAFD989D68 /* nAIceConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDE1D8F965B2A6A10696036 /* nAIceConfig.swift */; };
 		64AE36FBAE436BF5C5083453 /* AgentHubModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611B95AF57FB9A53B5F9195C /* AgentHubModels.swift */; };
+		742527D98488776B43538E3B /* NAContactService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F7BCFA84BB0E549E0CE361 /* NAContactService.swift */; };
 		821707D29B1D51857BFCF78A /* NAJournalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30D067B3957F4996F92E721A /* NAJournalService.swift */; };
 		8618A9261B8047CEA6084798 /* SlashCommandAutocompleteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2A37872AC842629FBDDFA4 /* SlashCommandAutocompleteView.swift */; };
 		8B71DA2AAC521382F54A841C /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B5FD09B6B5937573B5F9A4 /* InsightsView.swift */; };
@@ -485,6 +486,7 @@
 		5D9DCD6C3FAEA0D39B31AE55 /* AgentHubView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AgentHubView.swift; path = AgentHub/AgentHubView.swift; sourceTree = "<group>"; };
 		5DA59130ED4141049177576C /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
 		611B95AF57FB9A53B5F9195C /* AgentHubModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AgentHubModels.swift; path = AgentHub/Models/AgentHubModels.swift; sourceTree = "<group>"; };
+		63F7BCFA84BB0E549E0CE361 /* NAContactService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NAContactService.swift; sourceTree = "<group>"; };
 		6809B8F1391248A4AA77C453 /* SlashCommandExecutorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommandExecutorTests.swift; sourceTree = "<group>"; };
 		6B5ACB472A3949B1B4D161F6 /* JournalCheckinCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JournalCheckinCard.swift; path = JournalCheckinCard.swift; sourceTree = "<group>"; };
 		8C56E6D23E631D3EE0FF26B4 /* DetailViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailViews.swift; path = AgentHub/DetailViews/DetailViews.swift; sourceTree = "<group>"; };
@@ -1322,6 +1324,7 @@
 				585D173240AB85DED12058BE /* NARollupModels.swift */,
 				1CAD6A4F60CF55B0BD8D7546 /* NARollupService.swift */,
 				30D067B3957F4996F92E721A /* NAJournalService.swift */,
+				63F7BCFA84BB0E549E0CE361 /* NAContactService.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -1741,6 +1744,7 @@
 				D9327589D49ED4EC676438FA /* NARollupService.swift in Sources */,
 				821707D29B1D51857BFCF78A /* NAJournalService.swift in Sources */,
 				2218CE382CB8F604BD01051F /* JournalCheckinCard.swift in Sources */,
+				742527D98488776B43538E3B /* NAContactService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
