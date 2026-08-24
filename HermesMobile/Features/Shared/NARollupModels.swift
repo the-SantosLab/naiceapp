@@ -51,6 +51,8 @@ struct NAWhoopCycle: Codable {
     let kcal: Double?
     let avg_hr: Int?
     let max_hr: Int?
+    let start: String?
+    let end: String?
 }
 
 struct NAWhoopTrends: Codable {
@@ -87,6 +89,7 @@ struct NAJournalRollup: Codable {
     let entries: [NAJournalEntry]?
     let count: Int
     let this_week: Int?
+    let avg_clarity_week: Int?
 }
 
 struct NAJournalEntry: Codable, Identifiable {
@@ -98,8 +101,8 @@ struct NAJournalEntry: Codable, Identifiable {
 struct NABusinessRollup: Codable {
     let foodloop: NABusinessProject?
     let naice: NABusinessProject?
-    let schaffer: NABusinessProject?
-    let parcelmate: NABusinessProject?
+    let schaffer: NABusinessExtra?
+    let parcelmate: NABusinessExtra?
 }
 
 struct NABusinessProject: Codable {
@@ -107,6 +110,20 @@ struct NABusinessProject: Codable {
     let statuses: [String: Int]?
     let hot: Int?
     let emails: [String: Int]?
+    let pitched_today: Int?
+    let replies_week: Int?
+}
+
+struct NABusinessExtra: Codable {
+    let b2b_leads: Int?
+    let pageviews_today: Int?
+    let pageviews_week: Int?
+    let subscribers: Int?
+    let orders: Int?
+    let inquiries: Int?
+    let users: Int?
+    let shipments: Int?
+    let newsletter_leads: Int?
 }
 
 struct NATasksRollup: Codable {
@@ -154,6 +171,6 @@ struct NASummary: Codable {
 
 struct NASummaryFlag: Codable, Identifiable {
     var id: String { text }
-    let level: String   // "yellow", "red", "green"
+    let level: String
     let text: String
 }
